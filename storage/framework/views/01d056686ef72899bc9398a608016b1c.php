@@ -29,11 +29,11 @@
             </div>
         </a>
 
-        <!-- Total Peminjaman -->
+        <!-- Total Peminjaman Hari Ini -->
         <a href="<?php echo e(route('admin.laporan')); ?>" class="rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-blue-300 hover:shadow-sm">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-slate-500">Total Peminjaman</p>
+                    <p class="text-sm text-slate-500">Total Peminjaman Hari Ini</p>
                     <p class="mt-2 text-2xl font-bold text-blue-600"><?php echo e($totalPeminjaman); ?></p>
                 </div>
                 <div class="text-3xl text-blue-300"><i class="fas fa-calendar-check"></i></div>
@@ -41,7 +41,7 @@
         </a>
 
         <!-- Booking Sedang Berlangsung -->
-        <a href="<?php echo e(route('admin.notifikasi.booking')); ?>" class="rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-blue-300 hover:shadow-sm">
+        <a href="<?php echo e(route('admin.laporan')); ?>" class="rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-blue-300 hover:shadow-sm">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-slate-500">Sedang Berlangsung</p>
@@ -82,13 +82,13 @@
 
     <?php if($bookingPerluVerifikasi > 0): ?>
         <div class="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p class="text-blue-800 font-semibold"><i class="fas fa-check-circle mr-2"></i>Ada <?php echo e($bookingPerluVerifikasi); ?> booking yang perlu diverifikasi. <a href="<?php echo e(route('admin.notifikasi.booking')); ?>" class="font-bold underline">Verifikasi Sekarang →</a></p>
+            <p class="text-blue-800 font-semibold"><i class="fas fa-check-circle mr-2"></i>Ada <?php echo e($bookingPerluVerifikasi); ?> booking yang perlu diverifikasi. <a href="<?php echo e(route('admin.laporan')); ?>" class="font-bold underline">Lihat Laporan →</a></p>
         </div>
     <?php endif; ?>
 
     <?php if($laporanRusakMenunggu > 0): ?>
         <div class="mb-8 rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <p class="font-semibold text-amber-800"><i class="fas fa-triangle-exclamation mr-2"></i>Ada <?php echo e($laporanRusakMenunggu); ?> laporan barang rusak menunggu tindak lanjut.</p>
+            <p class="font-semibold text-amber-800"><i class="fas fa-triangle-exclamation mr-2"></i>Ada <?php echo e($laporanRusakMenunggu); ?> laporan barang rusak aktif (sedang ditinjau) yang perlu tindak lanjut.</p>
         </div>
     <?php endif; ?>
 
@@ -116,7 +116,7 @@
 
                                 </p>
                             </div>
-                            <a href="<?php echo e(route('admin.verifikasi.booking', $booking->id)); ?>" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold whitespace-nowrap ml-4">
+                            <a href="<?php echo e(route('admin.laporan')); ?>" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold whitespace-nowrap ml-4">
                                 <i class="fas fa-check-circle mr-1"></i>Verifikasi
                             </a>
                         </div>
@@ -127,50 +127,136 @@
     <?php endif; ?>
 
     <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <div class="border-b border-slate-200 bg-slate-50 px-5 py-3">
-                <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600">Tiket Hari Ini (Semua Status)</h3>
+        <section
+            class="overflow-hidden rounded-2xl border border-slate-200 bg-white cursor-pointer"
+            onclick="if (!event.target.closest('a')) { window.location='<?php echo e(route('admin.laporan')); ?>'; }"
+        >
+            <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3">
+                <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600">Tiket Hari Ini</h3>
+                <a href="<?php echo e(route('admin.laporan')); ?>" class="text-xs font-semibold text-blue-700 hover:text-blue-900">Lihat Semua</a>
             </div>
             <div class="divide-y divide-slate-100">
                 <?php $__empty_1 = true; $__currentLoopData = $tiketHariIni; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $ticket): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                    <a href="<?php echo e(route('admin.verifikasi.booking', $ticket->id)); ?>" class="block px-5 py-3 text-sm hover:bg-slate-50 transition-colors">
-                        <p class="font-semibold text-slate-800"><?php echo e($ticket->user->name); ?> · <?php echo e($ticket->kode_booking); ?></p>
-                        <p class="mt-1 text-xs text-slate-500">
-                            <?php echo e($ticket->waktu_mulai_booking->format('H:i')); ?> - <?php echo e($ticket->waktu_selesai_booking->format('H:i')); ?> ·
-                            <?php echo e($ticket->thing->nama ?? $ticket->room->nama ?? '-'); ?>
+                    <?php
+                        $statusClass = match ($ticket->status) {
+                            'Berlangsung' => 'bg-emerald-100 text-emerald-700',
+                            'Selesai' => 'bg-slate-200 text-slate-700',
+                            'Dibatalkan' => 'bg-rose-100 text-rose-700',
+                            'Pelanggaran' => 'bg-amber-100 text-amber-700',
+                            default => 'bg-blue-100 text-blue-700',
+                        };
+                    ?>
+                    <a href="<?php echo e(route('admin.laporan')); ?>" class="block px-5 py-3 text-sm hover:bg-slate-50 transition-colors">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="font-semibold text-slate-800"><?php echo e($ticket->user->name); ?> · <?php echo e($ticket->kode_booking); ?></p>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    <?php echo e($ticket->waktu_mulai_booking->format('H:i')); ?> - <?php echo e($ticket->waktu_selesai_booking->format('H:i')); ?> ·
+                                    <?php echo e($ticket->thing->nama ?? $ticket->room->nama ?? '-'); ?>
 
-                        </p>
+                                </p>
+                            </div>
+                            <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap <?php echo e($statusClass); ?>"><?php echo e($ticket->status); ?></span>
+                        </div>
                     </a>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                     <p class="px-5 py-4 text-sm text-slate-500">Tidak ada tiket booking untuk hari ini.</p>
                 <?php endif; ?>
             </div>
         </section>
+
+        <section
+            class="overflow-hidden rounded-2xl border border-slate-200 bg-white cursor-pointer"
+            onclick="if (!event.target.closest('a')) { window.location='<?php echo e(route('admin.laporan')); ?>'; }"
+        >
+            <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3">
+                <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600">Tiket Sedang Berlangsung</h3>
+                <a href="<?php echo e(route('admin.laporan')); ?>" class="text-xs font-semibold text-blue-700 hover:text-blue-900">Lihat Semua</a>
+            </div>
+            <div class="divide-y divide-slate-100">
+                <?php $__empty_1 = true; $__currentLoopData = $tiketBerlangsung; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $ticket): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <a href="<?php echo e(route('admin.laporan')); ?>" class="block px-5 py-3 text-sm hover:bg-slate-50 transition-colors">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="font-semibold text-slate-800"><?php echo e($ticket->user->name); ?> · <?php echo e($ticket->kode_booking); ?></p>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    <?php echo e($ticket->waktu_mulai_booking->format('H:i')); ?> - <?php echo e($ticket->waktu_selesai_booking->format('H:i')); ?> ·
+                                    <?php echo e($ticket->thing->nama ?? $ticket->room->nama ?? '-'); ?>
+
+                                </p>
+                            </div>
+                            <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 whitespace-nowrap">Berlangsung</span>
+                        </div>
+                    </a>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <p class="px-5 py-4 text-sm text-slate-500">Tidak ada tiket berstatus berlangsung saat ini.</p>
+                <?php endif; ?>
+            </div>
+        </section>
     </div>
 
-    <div class="mt-6">
-        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <div class="border-b border-slate-200 bg-slate-50 px-5 py-3">
+    <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <section
+            class="overflow-hidden rounded-2xl border border-slate-200 bg-white cursor-pointer"
+            onclick="if (!event.target.closest('a')) { window.location='<?php echo e(route('admin.laporan')); ?>'; }"
+        >
+            <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3">
                 <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600">Pelanggaran Terbaru</h3>
+                <a href="<?php echo e(route('admin.laporan')); ?>" class="text-xs font-semibold text-blue-700 hover:text-blue-900">Lihat Semua</a>
             </div>
             <div class="divide-y divide-slate-100">
                 <?php $__empty_1 = true; $__currentLoopData = $pelanggaran; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                    <div class="px-5 py-3 text-sm">
-                        <p class="font-semibold text-slate-800"><?php echo e($item->user->name ?? '-'); ?> · <?php echo e($item->kode_booking); ?></p>
-                        <p class="mt-1 text-xs text-slate-500">
-                            Tidak Check-in · Tidak Check-out
-                            · <?php echo e($item->thing->nama ?? $item->room->nama ?? '-'); ?>
+                    <a href="<?php echo e(route('admin.laporan')); ?>" class="block px-5 py-3 text-sm hover:bg-slate-50 transition-colors">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="font-semibold text-slate-800"><?php echo e($item->user->name ?? '-'); ?> · <?php echo e($item->kode_booking); ?></p>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Tidak Check-in · Tidak Check-out · <?php echo e($item->thing->nama ?? $item->room->nama ?? '-'); ?>
 
-                        </p>
-                    </div>
+                                </p>
+                            </div>
+                            <span class="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-700 whitespace-nowrap">Pelanggaran</span>
+                        </div>
+                    </a>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                     <p class="px-5 py-4 text-sm text-slate-500">Tidak ada data pelanggaran check-in/check-out terbaru.</p>
                 <?php endif; ?>
             </div>
-            <div class="border-t border-slate-200 bg-slate-50 px-5 py-3 text-right">
-                <a href="<?php echo e(route('admin.pelanggaran')); ?>" class="text-xs font-semibold text-blue-700 hover:text-blue-900">
-                    Lihat Kelola Penalti <i class="fas fa-arrow-right ml-1"></i>
-                </a>
+        </section>
+
+        <section
+            class="overflow-hidden rounded-2xl border border-slate-200 bg-white cursor-pointer"
+            onclick="if (!event.target.closest('a')) { window.location='<?php echo e(route('admin.laporan.rusak')); ?>'; }"
+        >
+            <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3">
+                <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600">Laporan Barang Rusak</h3>
+                <a href="<?php echo e(route('admin.laporan.rusak')); ?>" class="text-xs font-semibold text-blue-700 hover:text-blue-900">Lihat Semua</a>
+            </div>
+            <div class="divide-y divide-slate-100">
+                <?php $__empty_1 = true; $__currentLoopData = $laporanRusakTerbaru; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $report): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <?php
+                        $reportStatus = $report->status ?: 'Sedang Ditinjau';
+                        $reportStatusClass = match ($reportStatus) {
+                            'Selesai Ditangani' => 'bg-emerald-100 text-emerald-700',
+                            'Ditolak' => 'bg-rose-100 text-rose-700',
+                            default => 'bg-amber-100 text-amber-700',
+                        };
+                    ?>
+                    <a href="<?php echo e(route('admin.laporan.rusak.detail', $report->id)); ?>" class="block px-5 py-3 text-sm hover:bg-slate-50 transition-colors">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="font-semibold text-slate-800"><?php echo e($report->user->name ?? '-'); ?> · <?php echo e($report->thing->kode_thing ?? '-'); ?></p>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    <?php echo e($report->thing->nama ?? 'Barang tidak ditemukan'); ?> · <?php echo e($report->created_at->format('d M Y H:i')); ?>
+
+                                </p>
+                            </div>
+                            <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap <?php echo e($reportStatusClass); ?>"><?php echo e($reportStatus); ?></span>
+                        </div>
+                    </a>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                    <p class="px-5 py-4 text-sm text-slate-500">Belum ada laporan barang rusak.</p>
+                <?php endif; ?>
             </div>
         </section>
     </div>

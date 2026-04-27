@@ -5,7 +5,7 @@
     $isCreate = !isset($user);
     $isStaffScope = $scope === 'staff';
     $backRoute = $scope === 'staff' ? route('admin.user.staff') : route('admin.user.peminjam');
-    $selectedRole = $user->role ?? old('role') ?? ($scope === 'staff' ? 'verifikator' : 'peminjam');
+    $selectedRole = $user->role ?? old('role') ?? ($scope === 'staff' ? 'admin' : 'peminjam');
 @endphp
 
 @section('page_title', isset($user) ? 'Edit User' : 'Tambah User')
@@ -19,7 +19,7 @@
             Dashboard
         </a>
         <span>/</span>
-        <a href="{{ $backRoute }}" class="hover:text-blue-600">{{ $scope === 'staff' ? 'User Admin & Verifikator' : 'User Peminjam' }}</a>
+        <a href="{{ $backRoute }}" class="hover:text-blue-600">{{ $scope === 'staff' ? 'User Admin' : 'User Peminjam' }}</a>
         <span>/</span>
         <span>{{ isset($user) ? 'Edit User' : 'Tambah User' }}</span>
     </div>
@@ -80,7 +80,6 @@
                         @if(!$isCreate)
                             <option value="peminjam" {{ $selectedRole === 'peminjam' ? 'selected' : '' }}>Peminjam</option>
                         @endif
-                        <option value="verifikator" {{ $selectedRole === 'verifikator' ? 'selected' : '' }}>Verifikator</option>
                         <option value="admin" {{ $selectedRole === 'admin' ? 'selected' : '' }}>Admin</option>
                     </select>
                 </div>

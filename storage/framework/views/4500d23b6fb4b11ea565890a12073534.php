@@ -27,7 +27,7 @@
             <label class="mb-1 block text-xs font-semibold text-slate-600">Lokasi Simpan</label>
             <select name="lokasi" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                 <option value="">Semua</option>
-                <option value="Sarpras" <?php echo e($filterLokasi === 'Sarpras' ? 'selected' : ''); ?>>Sarpras</option>
+                <option value="Ruangan" <?php echo e($filterLokasi === 'Ruangan' ? 'selected' : ''); ?>>Ruangan</option>
             </select>
         </div>
         <div class="flex items-end">
@@ -140,9 +140,11 @@
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-slate-600">Lokasi Penggunaan Barang</label>
                     <select name="lokasi_penggunaan" x-model="lokasi" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" <?php echo e($bookingBlocked ? 'disabled' : ''); ?>>
+                        <option value="" <?php echo e(old('lokasi_penggunaan', '') === '' ? 'selected' : ''); ?>>Pilih ruangan</option>
                         <?php $__currentLoopData = $lokasiOptions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $lokasi): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                            <option value="<?php echo e($lokasi); ?>" <?php echo e(old('lokasi_penggunaan', 'Laboratorium Komputer') === $lokasi ? 'selected' : ''); ?>><?php echo e($lokasi); ?></option>
+                            <option value="<?php echo e($lokasi->id); ?>" <?php echo e((string) old('lokasi_penggunaan', '') === (string) $lokasi->id ? 'selected' : ''); ?>><?php echo e($lokasi->nama); ?> - <?php echo e($lokasi->status); ?></option>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                        <option value="Lainnya" <?php echo e(old('lokasi_penggunaan') === 'Lainnya' ? 'selected' : ''); ?>>Lainnya</option>
                     </select>
                 </div>
 
@@ -170,6 +172,9 @@
                     <div>
                         <p class="text-xs text-slate-500"><?php echo e($item->kode_thing); ?></p>
                         <h3 class="mt-1 font-semibold"><?php echo e($item->nama); ?></h3>
+                        <?php if(!is_null($item->room_id)): ?>
+                            <p class="mt-1 text-[11px] text-slate-500">Lokasi: <?php echo e($item->room?->nama ?? 'Ruangan'); ?></p>
+                        <?php endif; ?>
                     </div>
                     <span class="rounded-full px-2.5 py-1 text-xs font-semibold <?php echo e($statusClass); ?>"><?php echo e($statusLabel); ?></span>
                 </div>
@@ -179,22 +184,22 @@
                     <div class="mt-2 flex flex-wrap gap-1.5 text-[10px]">
                         <?php
                             $availableTimes = collect($itemTimeOptions[$item->id] ?? []);
-                            $allTimes = collect($allTimeOptions->values());
-                            $unavailableTimes = $allTimes->reject(fn ($time) => $availableTimes->contains($time));
+                            $detailTimes = collect($detailTimeOptions->values());
+                            $nowTime = \Illuminate\Support\Carbon::now()->format('H:i');
                         ?>
-                        <?php $__empty_2 = true; $__currentLoopData = $availableTimes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $time): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_2 = false; ?>
-                            <span class="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-800"><?php echo e($time); ?></span>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_2): ?>
-                            <span class="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-500">Tidak ada sesi tersedia</span>
-                        <?php endif; ?>
+                        <?php $__currentLoopData = $detailTimes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $time): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <?php
+                                $isPast = $time <= $nowTime;
+                                $isAvailable = $availableTimes->contains($time);
+                                $timeClass = $isPast
+                                    ? 'bg-slate-200 text-slate-500'
+                                    : ($isAvailable
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : 'bg-rose-100 text-rose-800');
+                            ?>
+                            <span class="rounded-full px-2 py-1 font-semibold <?php echo e($timeClass); ?>"><?php echo e($time); ?></span>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </div>
-                    <?php if($unavailableTimes->isNotEmpty()): ?>
-                        <div class="mt-3 flex flex-wrap gap-1.5 text-[10px]">
-                            <?php $__currentLoopData = $unavailableTimes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $time): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                <span class="rounded-full border border-slate-300 px-2 py-1 font-semibold text-slate-400 line-through"><?php echo e($time); ?></span>
-                            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                        </div>
-                    <?php endif; ?>
                 </div>
 
                 <?php if($isAvailable): ?>
@@ -229,7 +234,7 @@
                 start: <?php echo json_encode($cartWindow['jam_mulai'] ?? old('jam_mulai', ''), 512) ?>,
                 end: <?php echo json_encode($cartWindow['jam_selesai'] ?? old('jam_selesai', ''), 512) ?>,
                 alasan: '<?php echo e(old('alasan_peminjaman', 'Praktikum')); ?>',
-                lokasi: '<?php echo e(old('lokasi_penggunaan', 'Laboratorium Komputer')); ?>',
+                lokasi: <?php echo json_encode(old('lokasi_penggunaan', ''), 512) ?>,
                 endOptions: [],
                 hasSession() {
                     return this.start !== '' && this.end !== '';

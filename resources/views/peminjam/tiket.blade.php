@@ -142,6 +142,7 @@
                         <form x-show="openReport" action="{{ route('borrow.report-damage') }}" method="POST" enctype="multipart/form-data" class="mt-3 space-y-2 rounded-xl border border-rose-200 bg-rose-50 p-3">
                             @csrf
                             <input type="hidden" name="borrow_id" value="{{ $item->id }}">
+                            <input type="hidden" name="kode_booking" value="{{ $item->kode_booking }}">
                             <div>
                                 <label class="mb-1 block text-xs font-semibold text-rose-700">Lokasi Barang</label>
                                 <input type="text" name="lokasi_barang" required class="w-full rounded-lg border border-rose-300 px-3 py-2 text-sm" placeholder="Contoh: Ruang 302, meja depan">

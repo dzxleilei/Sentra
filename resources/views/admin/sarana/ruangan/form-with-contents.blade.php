@@ -91,19 +91,27 @@
                         </tr>
                     </thead>
                     <tbody id="barang-table" class="divide-y divide-slate-200">
-                        @if(isset($ruangan) && $ruangan->contents->count() > 0)
-                            @foreach($ruangan->contents as $content)
+                        @php
+                            $selectedThingIds = collect($selectedThingIds ?? []);
+                        @endphp
+
+                        @if($selectedThingIds->count() > 0)
+                            @foreach($selectedThingIds as $selectedThingId)
+                                @php
+                                    $selectedThing = $semua_barang->firstWhere('id', (int) $selectedThingId);
+                                @endphp
+                                @if($selectedThing)
                                 <tr class="hover:bg-slate-50">
                                     <td class="px-4 py-3">
                                         <select name="barang[]" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" onchange="updateKode(this)">
                                             <option value="">-- Pilih Barang --</option>
                                             @foreach($semua_barang as $barang)
-                                                <option value="{{ $barang->id }}" {{ $content->thing_id === $barang->id ? 'selected' : '' }}>{{ $barang->nama }}</option>
+                                                <option value="{{ $barang->id }}" data-kode="{{ $barang->kode_thing }}" {{ (int) $selectedThingId === (int) $barang->id ? 'selected' : '' }}>{{ $barang->nama }}</option>
                                             @endforeach
                                         </select>
                                     </td>
                                     <td class="px-4 py-3">
-                                        <input type="text" class="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm" readonly value="{{ $content->thing->kode_thing }}">
+                                        <input type="text" class="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm" readonly value="{{ $selectedThing->kode_thing }}">
                                     </td>
                                     <td class="px-4 py-3">
                                         <button type="button" onclick="hapusBaris(this)" class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100">
@@ -111,6 +119,7 @@
                                         </button>
                                     </td>
                                 </tr>
+                                @endif
                             @endforeach
                         @endif
                     </tbody>
@@ -147,7 +156,7 @@ function tambahBaris() {
             <select name="barang[]" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" onchange="updateKode(this)">
                 <option value="">-- Pilih Barang --</option>
                 @foreach($semua_barang as $barang)
-                    <option value="{{ $barang->id }}">{{ $barang->nama }}</option>
+                    <option value="{{ $barang->id }}" data-kode="{{ $barang->kode_thing }}">{{ $barang->nama }}</option>
                 @endforeach
             </select>
         </td>
@@ -163,6 +172,7 @@ function tambahBaris() {
     
     table.appendChild(row);
     if (emptyMsg) emptyMsg.style.display = 'none';
+    refreshBarangOptions();
 }
 
 function hapusBaris(btn) {
@@ -172,16 +182,48 @@ function hapusBaris(btn) {
         const emptyMsg = document.getElementById('empty-message');
         if (emptyMsg) emptyMsg.style.display = 'block';
     }
+    refreshBarangOptions();
 }
 
 function updateKode(select) {
     const selectedOption = select.options[select.selectedIndex];
-    const kodeTd = select.closest('tr').cells[1];
-    const barangKode = selectedOption.text.split('(')[1]?.replace(')', '');
-    
-    // Find the kode from the selected option
-    const allOptions = select.querySelectorAll('option');
-    const kodeInput = kodeTd.querySelector('input');
+    const row = select.closest('tr');
+    if (!row) return;
+
+    const kodeInput = row.cells[1]?.querySelector('input');
+    if (!kodeInput) return;
+
+    kodeInput.value = selectedOption?.dataset?.kode || '';
+    refreshBarangOptions();
+}
+
+function refreshBarangOptions() {
+    const table = document.getElementById('barang-table');
+    if (!table) return;
+
+    const selects = Array.from(table.querySelectorAll('select[name="barang[]"]'));
+
+    selects.forEach((select) => {
+        const currentValue = select.value;
+        const selectedInOtherRows = new Set(
+            selects
+                .filter((other) => other !== select)
+                .map((other) => other.value)
+                .filter((value) => value !== '')
+        );
+
+        Array.from(select.options).forEach((option, index) => {
+            if (index === 0 || option.value === '') {
+                option.hidden = false;
+                option.disabled = false;
+                return;
+            }
+
+            const shouldHide = selectedInOtherRows.has(option.value) && option.value !== currentValue;
+            option.hidden = shouldHide;
+            option.disabled = shouldHide;
+        });
+    });
 }
 
 // Hide empty message if there are rows
@@ -191,6 +233,9 @@ window.addEventListener('load', function() {
         const emptyMsg = document.getElementById('empty-message');
         if (emptyMsg) emptyMsg.style.display = 'none';
     }
+
+    table.querySelectorAll('select[name="barang[]"]').forEach((select) => updateKode(select));
+    refreshBarangOptions();
 });
 </script>
 @endsection

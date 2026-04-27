@@ -29,10 +29,6 @@
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ route('room.list') }}">Pinjam Ruangan</a>
                             </li>
-                        @elseif(auth()->user()->role == 'verifikator')
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ route('verifikator.dashboard') }}">Dashboard Verifikator</a>
-                            </li>
                         @elseif(auth()->user()->role == 'admin')
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ route('admin.dashboard') }}">Dashboard Admin</a>

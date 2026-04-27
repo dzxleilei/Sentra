@@ -9,10 +9,13 @@ use App\Models\AppSetting;
 use App\Models\PenaltyLog;
 use App\Models\Thing;
 use App\Models\Room;
+use App\Models\RoomContent;
 use App\Models\User;
 use App\Services\BorrowLifecycleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
@@ -29,13 +32,14 @@ class DashboardController extends Controller
 
         $totalRuangan = Room::count();
         $totalBarang = Thing::count();
-        $totalPeminjaman = Borrow::count();
+        $totalPeminjaman = Borrow::whereDate('waktu_mulai_booking', today())->count();
         $totalPelanggaran = Borrow::where('status', 'Pelanggaran')->count();
         $totalBookingHariIni = Borrow::whereDate('waktu_mulai_booking', today())->count();
         $bookingTanpaCheckin = Borrow::where('status', 'Booking')
             ->whereNull('waktu_checkin')
-            ->where('waktu_mulai_booking', '<=', now())
-            ->count();
+            ->where('waktu_mulai_booking', '<=', now()->subMinutes(15))
+            ->distinct('kode_booking')
+            ->count('kode_booking');
         
         // Booking yang sedang berlangsung & perlu diverifikasi
         $bookingSedangBerlangsung = Borrow::where('status', 'Berlangsung')
@@ -68,8 +72,24 @@ class DashboardController extends Controller
             ->values()
             ->take(8);
 
-        $totalLaporanRusak = DamageReport::count();
-        $laporanRusakMenunggu = DamageReport::where('status', 'Menunggu Verifikasi')->count();
+        $tiketBerlangsung = Borrow::with(['user', 'thing', 'room'])
+            ->where('status', 'Berlangsung')
+            ->orderBy('waktu_selesai_booking')
+            ->get()
+            ->unique('kode_booking')
+            ->values()
+            ->take(8);
+
+        $laporanRusakTerbaru = DamageReport::with(['user', 'thing'])
+            ->latest()
+            ->limit(8)
+            ->get();
+
+        $totalLaporanRusak = DamageReport::where(function ($query) {
+            $query->whereIn('status', ['Sedang Ditinjau', 'Menunggu Verifikasi'])
+                ->orWhereNull('status');
+        })->count();
+        $laporanRusakMenunggu = $totalLaporanRusak;
         $totalPeminjamDibatasi = User::where('role', 'peminjam')
             ->where(function ($query) use ($threshold) {
                 $query->where('penalty_points', '>', $threshold)
@@ -92,6 +112,8 @@ class DashboardController extends Controller
             'laporanRusakMenunggu' => $laporanRusakMenunggu,
             'totalPeminjamDibatasi' => $totalPeminjamDibatasi,
             'tiketHariIni' => $tiketHariIni,
+            'tiketBerlangsung' => $tiketBerlangsung,
+            'laporanRusakTerbaru' => $laporanRusakTerbaru,
         ]);
     }
 
@@ -102,6 +124,17 @@ class DashboardController extends Controller
         $search = trim((string) request('q', ''));
         $status = trim((string) request('status', ''));
         $lantai = trim((string) request('lantai', ''));
+        $sortBy = trim((string) request('sort_by', 'kode_room'));
+        $sortOrder = trim((string) request('sort_order', 'asc'));
+
+        // Validasi sort parameters
+        $validSortColumns = ['kode_room', 'nama', 'lantai', 'status'];
+        if (!in_array($sortBy, $validSortColumns)) {
+            $sortBy = 'kode_room';
+        }
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'asc';
+        }
 
         $ruangan = Room::query()
             ->when($search !== '', function ($query) use ($search) {
@@ -117,7 +150,7 @@ class DashboardController extends Controller
             ->when($lantai !== '', function ($query) use ($lantai) {
                 $query->where('lantai', 'like', "%{$lantai}%");
             })
-            ->orderBy('nama', 'asc')
+            ->orderBy($sortBy, $sortOrder)
             ->paginate(10)
             ->withQueryString();
 
@@ -126,6 +159,8 @@ class DashboardController extends Controller
             'search' => $search,
             'statusFilter' => $status,
             'lantaiFilter' => $lantai,
+            'sortBy' => $sortBy,
+            'sortOrder' => $sortOrder,
         ]);
     }
 
@@ -181,6 +216,17 @@ class DashboardController extends Controller
         $search = trim((string) request('q', ''));
         $status = trim((string) request('status', ''));
         $roomId = trim((string) request('room_id', ''));
+        $sortBy = trim((string) request('sort_by', 'kode_thing'));
+        $sortOrder = trim((string) request('sort_order', 'asc'));
+
+        // Validasi sort parameters
+        $validSortColumns = ['kode_thing', 'nama', 'status'];
+        if (!in_array($sortBy, $validSortColumns)) {
+            $sortBy = 'kode_thing';
+        }
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'asc';
+        }
 
         $barang = Thing::with('room')
             ->when($search !== '', function ($query) use ($search) {
@@ -198,7 +244,7 @@ class DashboardController extends Controller
             ->when($roomId !== '', function ($query) use ($roomId) {
                 $query->where('room_id', $roomId);
             })
-            ->orderBy('nama', 'asc')
+            ->orderBy($sortBy, $sortOrder)
             ->paginate(10)
             ->withQueryString();
 
@@ -210,6 +256,8 @@ class DashboardController extends Controller
             'search' => $search,
             'statusFilter' => $status,
             'roomFilter' => $roomId,
+            'sortBy' => $sortBy,
+            'sortOrder' => $sortOrder,
         ]);
     }
 
@@ -220,7 +268,7 @@ class DashboardController extends Controller
             $validated = $request->validate([
                 'kode_thing' => 'required|unique:things|max:20',
                 'nama' => 'required|max:255',
-                'room_id' => 'nullable|exists:rooms,id',
+                'room_id' => 'required|exists:rooms,id',
                 'status' => 'required|in:Tersedia,Dipinjam,Tidak Tersedia',
             ]);
 
@@ -241,7 +289,7 @@ class DashboardController extends Controller
             $validated = $request->validate([
                 'kode_thing' => 'required|unique:things,kode_thing,' . $barang->id . '|max:20',
                 'nama' => 'required|max:255',
-                'room_id' => 'nullable|exists:rooms,id',
+                'room_id' => 'required|exists:rooms,id',
                 'status' => 'required|in:Tersedia,Dipinjam,Tidak Tersedia',
             ]);
 
@@ -261,13 +309,6 @@ class DashboardController extends Controller
     }
 
     // ===== MANAJEMEN PENALTI =====
-    
-    public function daftarPelanggaran()
-    {
-        $this->borrowLifecycleService->enforceRules();
-
-        return view('admin.pelanggaran.daftar');
-    }
 
     public function tambahPenaltiPeminjam(Request $request)
     {
@@ -390,7 +431,7 @@ class DashboardController extends Controller
             'catatan_pelanggaran' => $validated['catatan_pelanggaran'] ?? $borrow->catatan_pelanggaran,
         ]);
 
-        return redirect()->route('admin.pelanggaran')->with('success', 'Penalti diperbarui');
+        return redirect()->route('admin.laporan')->with('success', 'Penalti diperbarui');
     }
 
     // ===== LAPORAN =====
@@ -497,6 +538,62 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function laporanRusakDetail(int $id)
+    {
+        $this->borrowLifecycleService->enforceRules();
+
+        $report = DamageReport::with(['user', 'thing.room', 'borrow'])
+            ->findOrFail($id);
+
+        return view('admin.laporan.rusak-detail', [
+            'report' => $report,
+        ]);
+    }
+
+    public function updateLaporanRusakStatus(int $id, Request $request)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:Sedang Ditinjau,Ditolak,Selesai Ditangani',
+        ]);
+
+        $report = DamageReport::findOrFail($id);
+        $report->update([
+            'status' => $validated['status'],
+        ]);
+
+        return redirect()
+            ->route('admin.laporan.rusak.detail', $report->id)
+            ->with('success', 'Status laporan barang rusak berhasil diperbarui.');
+    }
+
+    public function laporanRusakFoto(int $id)
+    {
+        $report = DamageReport::findOrFail($id);
+        $path = trim((string) $report->foto_bukti);
+
+        if ($path === '' || ! Storage::disk('public')->exists($path)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->response($path);
+    }
+
+    public function laporanTiketFoto(int $id, string $jenis)
+    {
+        $borrow = Borrow::findOrFail($id);
+
+        $path = match ($jenis) {
+            'awal' => trim((string) $borrow->foto_awal),
+            'akhir' => trim((string) $borrow->foto_akhir),
+            default => '',
+        };
+
+        if ($path === '' || ! Storage::disk('public')->exists($path)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->response($path);
+    }
     public function exportLaporan(Request $request)
     {
         $bulan = request('bulan');
@@ -553,24 +650,60 @@ class DashboardController extends Controller
     public function daftarUserPeminjam()
     {
         $threshold = AppSetting::integer('penalty_block_threshold', 20);
+        $sortBy = trim((string) request('sort_by', 'name'));
+        $sortOrder = trim((string) request('sort_order', 'asc'));
+
+        // Validasi sort parameters
+        $validSortColumns = ['name', 'email', 'created_at', 'penalty_points'];
+        if (!in_array($sortBy, $validSortColumns)) {
+            $sortBy = 'name';
+        }
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'asc';
+        }
+
         $users = User::where('role', 'peminjam')
             ->with(['penaltyLogs' => function ($query) {
                 $query->with(['admin', 'borrow'])->latest()->limit(10);
             }])
-            ->orderBy('name', 'asc')
-            ->paginate(15);
+            ->orderBy($sortBy, $sortOrder)
+            ->paginate(15)
+            ->withQueryString();
 
         return view('admin.user.daftar', [
             'users' => $users,
             'pageType' => 'peminjam',
             'penaltyBlockThreshold' => $threshold,
+            'sortBy' => $sortBy,
+            'sortOrder' => $sortOrder,
         ]);
     }
 
     public function daftarUserStaff()
     {
-        $users = User::whereIn('role', ['admin', 'verifikator'])->orderBy('name', 'asc')->paginate(15);
-        return view('admin.user.daftar', ['users' => $users, 'pageType' => 'staff']);
+        $sortBy = trim((string) request('sort_by', 'name'));
+        $sortOrder = trim((string) request('sort_order', 'asc'));
+
+        // Validasi sort parameters
+        $validSortColumns = ['name', 'email', 'role', 'created_at'];
+        if (!in_array($sortBy, $validSortColumns)) {
+            $sortBy = 'name';
+        }
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'asc';
+        }
+
+        $users = User::where('role', 'admin')
+            ->orderBy($sortBy, $sortOrder)
+            ->paginate(15)
+            ->withQueryString();
+        
+        return view('admin.user.daftar', [
+            'users' => $users,
+            'pageType' => 'staff',
+            'sortBy' => $sortBy,
+            'sortOrder' => $sortOrder,
+        ]);
     }
 
     public function tambahUser(Request $request)
@@ -580,7 +713,7 @@ class DashboardController extends Controller
                 'name' => 'required|max:255',
                 'email' => 'required|email|unique:users',
                 'password' => 'required|min:6',
-                'role' => 'required|in:admin,verifikator,peminjam',
+                'role' => 'required|in:admin,peminjam',
             ]);
 
             $this->validatePeminjamEmailDomain($validated['email'], $validated['role']);
@@ -602,7 +735,7 @@ class DashboardController extends Controller
                 'name' => 'required|max:255',
                 'email' => 'required|email|unique:users,email,' . $user->id,
                 'password' => 'nullable|min:6',
-                'role' => 'required|in:admin,verifikator,peminjam',
+                'role' => 'required|in:admin,peminjam',
             ]);
 
             $this->validatePeminjamEmailDomain($validated['email'], $validated['role']);
@@ -680,56 +813,11 @@ class DashboardController extends Controller
         return view('admin.user.import');
     }
 
-    // ===== FITUR VERIFIKATOR - BOOKING VALIDATION =====
-    
-    public function notifikasiBooking()
-    {
-        $notifikasi = Borrow::where('status', 'Berlangsung')
-            ->with('user', 'room', 'thing')
-            ->orderBy('waktu_selesai_booking', 'asc')
-            ->paginate(10);
-
-        return view('admin.verifikasi.notifikasi', ['notifikasi' => $notifikasi]);
-    }
-
-    public function detailBookingVerifikasi($id)
-    {
-        $booking = Borrow::with('user', 'room', 'thing')->findOrFail($id);
-        return view('admin.verifikasi.detail', ['booking' => $booking]);
-    }
-
-    public function validasiScanBooking($id, Request $request)
-    {
-        $booking = Borrow::findOrFail($id);
-
-        if ($booking->status === 'Dibatalkan') {
-            return redirect()->route('admin.verifikasi.booking', $booking->id)
-                ->withErrors(['status' => 'Booking yang sudah dibatalkan tidak bisa diverifikasi.']);
-        }
-
-        $validated = $request->validate([
-            'waktu_checkin' => 'nullable|date_format:Y-m-d\TH:i',
-            'waktu_checkout' => 'nullable|date_format:Y-m-d\TH:i',
-            'ada_pelanggaran' => 'nullable|boolean',
-            'catatan_pelanggaran' => 'nullable|string',
-        ]);
-
-        $booking->update([
-            'waktu_checkin' => $validated['waktu_checkin'] ?? $booking->waktu_checkin,
-            'waktu_checkout' => $validated['waktu_checkout'] ?? $booking->waktu_checkout,
-            'status' => !empty($validated['ada_pelanggaran']) ? 'Pelanggaran' : 'Selesai',
-            'catatan_pelanggaran' => $validated['catatan_pelanggaran'] ?? $booking->catatan_pelanggaran,
-            'diverifikasi_admin' => true,
-        ]);
-
-        return redirect()->route('admin.notifikasi.booking')->with('success', 'Booking berhasil diverifikasi');
-    }
-
     // ===== MANAJEMEN RUANGAN DENGAN BARANG =====
     
     public function editRuanganWithContents($id, Request $request)
     {
-        $ruangan = Room::with('contents.thing')->findOrFail($id);
+        $ruangan = Room::with(['contents.thing', 'things'])->findOrFail($id);
 
         if ($request->isMethod('post')) {
             $validated = $request->validate([
@@ -741,32 +829,121 @@ class DashboardController extends Controller
                 'barang.*' => 'nullable|exists:things,id',
             ]);
 
-            $ruangan->update([
-                'kode_room' => $validated['kode_room'],
-                'nama' => $validated['nama'],
-                'lantai' => $validated['lantai'],
-                'status' => $validated['status'],
-            ]);
+            $rawSelectedThingIds = collect($validated['barang'] ?? [])
+                ->filter(fn ($id) => !empty($id))
+                ->map(fn ($id) => (int) $id)
+                ->values();
 
-            // Update contents
-            $ruangan->contents()->delete();
-            if (!empty($validated['barang'])) {
-                foreach ($validated['barang'] as $index => $thing_id) {
-                    if (!empty($thing_id)) {
+            $selectedThingIds = $rawSelectedThingIds
+                ->unique()
+                ->values();
+
+            if ($rawSelectedThingIds->count() !== $selectedThingIds->count()) {
+                return back()->withErrors([
+                    'barang' => 'Barang yang sama tidak boleh dipilih lebih dari satu kali.',
+                ])->withInput();
+            }
+
+            $currentRoomThingIds = $ruangan->contents->pluck('thing_id')
+                ->merge($ruangan->things->pluck('id'))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $newlyAddedThingIds = $selectedThingIds
+                ->diff($currentRoomThingIds)
+                ->values();
+
+            $isAssignedToOtherRoom = $newlyAddedThingIds->isNotEmpty() && (
+                Thing::whereIn('id', $newlyAddedThingIds->all())
+                    ->whereNotNull('room_id')
+                    ->where('room_id', '!=', $ruangan->id)
+                    ->exists()
+                || RoomContent::whereIn('thing_id', $newlyAddedThingIds->all())
+                    ->where('room_id', '!=', $ruangan->id)
+                    ->exists()
+            );
+
+            if ($isAssignedToOtherRoom) {
+                return back()->withErrors([
+                    'barang' => 'Ada barang yang sudah dipakai di ruangan lain. Pilih barang yang belum dipakai.',
+                ])->withInput();
+            }
+
+            DB::transaction(function () use ($ruangan, $validated, $selectedThingIds) {
+                $ruangan->update([
+                    'kode_room' => $validated['kode_room'],
+                    'nama' => $validated['nama'],
+                    'lantai' => $validated['lantai'],
+                    'status' => $validated['status'],
+                ]);
+
+                // Sync mapping table room_contents.
+                $ruangan->contents()->delete();
+                if ($selectedThingIds->isNotEmpty()) {
+                    RoomContent::whereIn('thing_id', $selectedThingIds->all())
+                        ->where('room_id', '!=', $ruangan->id)
+                        ->delete();
+
+                    foreach ($selectedThingIds as $thingId) {
                         $ruangan->contents()->create([
-                            'thing_id' => $thing_id,
+                            'thing_id' => $thingId,
                         ]);
                     }
                 }
-            }
+
+                // Sync source-of-truth field used by booking flow.
+                $query = Thing::where('room_id', $ruangan->id);
+                if ($selectedThingIds->isNotEmpty()) {
+                    $query->whereNotIn('id', $selectedThingIds->all());
+                }
+                $query->update(['room_id' => null]);
+
+                if ($selectedThingIds->isNotEmpty()) {
+                    Thing::whereIn('id', $selectedThingIds->all())
+                        ->update(['room_id' => $ruangan->id]);
+                }
+            });
 
             return redirect()->route('admin.ruangan')->with('success', 'Ruangan berhasil diperbarui');
         }
 
-        $semua_barang = Thing::orderBy('nama', 'asc')->get();
+        $selectedThingIds = $ruangan->contents->pluck('thing_id')
+            ->merge($ruangan->things->pluck('id'))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $usedByOtherRoomsIds = RoomContent::where('room_id', '!=', $ruangan->id)
+            ->pluck('thing_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+
+        $semua_barang = Thing::query()
+            ->where(function ($query) use ($ruangan, $selectedThingIds) {
+                $query->whereNull('room_id')
+                    ->orWhere('room_id', $ruangan->id);
+
+                if ($selectedThingIds->isNotEmpty()) {
+                    $query->orWhereIn('id', $selectedThingIds->all());
+                }
+            })
+            ->when($usedByOtherRoomsIds->isNotEmpty(), function ($query) use ($usedByOtherRoomsIds, $selectedThingIds) {
+                $query->where(function ($inner) use ($usedByOtherRoomsIds, $selectedThingIds) {
+                    $inner->whereNotIn('id', $usedByOtherRoomsIds->all());
+
+                    if ($selectedThingIds->isNotEmpty()) {
+                        $inner->orWhereIn('id', $selectedThingIds->all());
+                    }
+                });
+            })
+            ->orderBy('nama', 'asc')
+            ->get();
+
         return view('admin.sarana.ruangan.form-with-contents', [
             'ruangan' => $ruangan,
-            'semua_barang' => $semua_barang
+            'semua_barang' => $semua_barang,
+            'selectedThingIds' => $selectedThingIds,
         ]);
     }
 
@@ -782,31 +959,75 @@ class DashboardController extends Controller
                 'barang.*' => 'nullable|exists:things,id',
             ]);
 
-            $ruangan = Room::create([
-                'kode_room' => $validated['kode_room'],
-                'nama' => $validated['nama'],
-                'lantai' => $validated['lantai'],
-                'status' => $validated['status'],
-            ]);
+            $rawSelectedThingIds = collect($validated['barang'] ?? [])
+                ->filter(fn ($id) => !empty($id))
+                ->map(fn ($id) => (int) $id)
+                ->values();
 
-            // Add contents
-            if (!empty($validated['barang'])) {
-                foreach ($validated['barang'] as $index => $thing_id) {
-                    if (!empty($thing_id)) {
+            $selectedThingIds = $rawSelectedThingIds
+                ->unique()
+                ->values();
+
+            if ($rawSelectedThingIds->count() !== $selectedThingIds->count()) {
+                return back()->withErrors([
+                    'barang' => 'Barang yang sama tidak boleh dipilih lebih dari satu kali.',
+                ])->withInput();
+            }
+
+            $isAlreadyAssigned = $selectedThingIds->isNotEmpty() && (
+                Thing::whereIn('id', $selectedThingIds->all())
+                    ->whereNotNull('room_id')
+                    ->exists()
+                || RoomContent::whereIn('thing_id', $selectedThingIds->all())
+                    ->exists()
+            );
+
+            if ($isAlreadyAssigned) {
+                return back()->withErrors([
+                    'barang' => 'Ada barang yang sudah dipakai di ruangan lain. Pilih barang yang belum dipakai.',
+                ])->withInput();
+            }
+
+            DB::transaction(function () use ($validated, $selectedThingIds) {
+                $ruangan = Room::create([
+                    'kode_room' => $validated['kode_room'],
+                    'nama' => $validated['nama'],
+                    'lantai' => $validated['lantai'],
+                    'status' => $validated['status'],
+                ]);
+
+                if ($selectedThingIds->isNotEmpty()) {
+                    RoomContent::whereIn('thing_id', $selectedThingIds->all())
+                        ->delete();
+
+                    foreach ($selectedThingIds as $thingId) {
                         $ruangan->contents()->create([
-                            'thing_id' => $thing_id,
+                            'thing_id' => $thingId,
                         ]);
                     }
+
+                    Thing::whereIn('id', $selectedThingIds->all())
+                        ->update(['room_id' => $ruangan->id]);
                 }
-            }
+            });
 
             return redirect()->route('admin.ruangan')->with('success', 'Ruangan berhasil ditambahkan');
         }
 
-        $semua_barang = Thing::orderBy('nama', 'asc')->get();
+        $usedThingIds = RoomContent::pluck('thing_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+
+        $semua_barang = Thing::query()
+            ->whereNull('room_id')
+            ->when($usedThingIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $usedThingIds->all()))
+            ->orderBy('nama', 'asc')
+            ->get();
+
         return view('admin.sarana.ruangan.form-with-contents', [
             'ruangan' => null,
-            'semua_barang' => $semua_barang
+            'semua_barang' => $semua_barang,
+            'selectedThingIds' => collect(),
         ]);
     }
 

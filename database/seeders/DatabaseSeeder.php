@@ -27,13 +27,6 @@ class DatabaseSeeder extends Seeder
             'role' => 'admin',
         ]);
 
-        $verifikator = User::create([
-            'name' => 'Verifikator User',
-            'email' => 'verifikator@itbss.ac.id',
-            'password' => Hash::make('password'),
-            'role' => 'verifikator',
-        ]);
-
         $peminjam1 = User::create([
             'name' => 'Peminjam Satu',
             'email' => 'peminjam1@itbss.ac.id',

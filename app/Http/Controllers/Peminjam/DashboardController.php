@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Peminjam;
 use App\Http\Controllers\Controller;
 use App\Models\Borrow;
 use App\Models\AppSetting;
+use App\Models\DamageReport;
 use App\Models\Thing;
 use App\Models\Room;
 use App\Services\BorrowLifecycleService;
@@ -77,7 +78,7 @@ class DashboardController extends Controller
         $filterLokasi = trim((string) $request->query('lokasi', ''));
 
         $barang = Thing::with('room')
-            ->whereNull('room_id')
+            ->whereNotNull('room_id')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($subQuery) use ($search) {
                     $subQuery->where('nama', 'like', '%' . $search . '%')
@@ -86,8 +87,8 @@ class DashboardController extends Controller
             })
             ->when($filterStatus !== '', fn ($query) => $query->where('status', $filterStatus))
             ->when($filterLokasi !== '', function ($query) use ($filterLokasi) {
-                if ($filterLokasi === 'Sarpras') {
-                    $query->whereNull('room_id');
+                if ($filterLokasi === 'Ruangan') {
+                    $query->whereNotNull('room_id');
                 }
             })
             ->when(count($cartIds) > 0, fn ($query) => $query->whereNotIn('id', $cartIds))
@@ -113,9 +114,10 @@ class DashboardController extends Controller
             'cartBarang' => $cartBarang,
             'timeOptions' => $cartTimeOptions,
             'allTimeOptions' => $allTimeOptions,
+            'detailTimeOptions' => $this->buildDailyTimeSlots(),
             'itemTimeOptions' => $itemTimeOptions,
             'cartWindow' => is_array($cartWindow) ? $cartWindow : null,
-            'lokasiOptions' => ['Laboratorium Komputer', 'Ruang Kelas', 'Ruang Meeting', 'Aula', 'Lainnya'],
+            'lokasiOptions' => Room::orderBy('nama')->get(['id', 'nama', 'status']),
             'search' => $search,
             'filterStatus' => $filterStatus,
             'filterLokasi' => $filterLokasi,
@@ -140,22 +142,46 @@ class DashboardController extends Controller
         return $options->values();
     }
 
+    private function buildDailyTimeSlots(): Collection
+    {
+        $slots = collect();
+
+        for ($hour = 8; $hour <= 21; $hour++) {
+            $slot = Carbon::today()->setTime($hour, 0, 0);
+            $slots->push($slot->format('H:i'));
+        }
+
+        return $slots->values();
+    }
+
     private function buildAvailableTimeOptionsForThings(array $thingIds): Collection
     {
         $baseOptions = $this->buildAvailableTimeOptions();
+        $things = Thing::whereIn('id', $thingIds)->get(['id', 'room_id'])->keyBy('id');
 
-        return $baseOptions->filter(function (string $time) use ($thingIds) {
+        return $baseOptions->filter(function (string $time) use ($thingIds, $things) {
             $slotStart = Carbon::today()->setTimeFromTimeString($time . ':00');
             $slotEnd = $slotStart->copy()->addHour();
 
             foreach ($thingIds as $thingId) {
+                $thing = $things->get($thingId);
+
                 $isBusy = Borrow::where('thing_id', $thingId)
                     ->whereIn('status', ['Booking', 'Berlangsung'])
                     ->where('waktu_mulai_booking', '<', $slotEnd)
                     ->where('waktu_selesai_booking', '>', $slotStart)
                     ->exists();
 
-                if ($isBusy) {
+                $isRoomBusy = $thing?->room_id
+                    ? Borrow::where('room_id', $thing->room_id)
+                        ->where('tipe', 'Ruangan')
+                        ->whereIn('status', ['Booking', 'Berlangsung'])
+                        ->where('waktu_mulai_booking', '<', $slotEnd)
+                        ->where('waktu_selesai_booking', '>', $slotStart)
+                        ->exists()
+                    : false;
+
+                if ($isBusy || $isRoomBusy) {
                     return false;
                 }
             }
@@ -239,6 +265,7 @@ class DashboardController extends Controller
             'ruangan' => $ruangan,
             'barang' => $barang,
             'timeOptions' => $this->buildAvailableTimeOptions(),
+            'detailTimeOptions' => $this->buildDailyTimeSlots(),
             'itemTimeOptions' => $itemTimeOptions,
             'todayLabel' => Carbon::now()->translatedFormat('l, d F Y H:i'),
             'bookingBlocked' => (int) Auth::user()->penalty_points > $threshold || ! empty(Auth::user()->blocked_at),
@@ -250,11 +277,77 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
         $this->borrowLifecycleService->enforceRules($user->id);
+
         $riwayat = Borrow::where('user_id', $user->id)
             ->with(['thing', 'room'])
             ->orderBy('created_at', 'desc')
-            ->paginate(10);
-        return view('peminjam.riwayat', ['riwayat' => $riwayat, 'penaltyPoints' => (int) $user->penalty_points]);
+            ->get();
+
+        $laporanRusak = DamageReport::where('user_id', $user->id)
+            ->with(['thing', 'borrow'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $riwayatGroups = $this->groupByAgeBuckets($riwayat, fn ($item) => $item->created_at);
+        $laporanRusakGroups = $this->groupByAgeBuckets($laporanRusak, fn ($item) => $item->created_at);
+
+        return view('peminjam.riwayat', [
+            'riwayat' => $riwayat,
+            'riwayatGroups' => $riwayatGroups,
+            'laporanRusak' => $laporanRusak,
+            'laporanRusakGroups' => $laporanRusakGroups,
+            'penaltyPoints' => (int) $user->penalty_points,
+        ]);
+    }
+
+    private function groupByAgeBuckets(Collection $items, callable $dateResolver): array
+    {
+        $now = Carbon::now();
+
+        $buckets = [
+            [
+                'key' => '7-hari',
+                'label' => '7 hari terakhir',
+                'items' => collect(),
+            ],
+            [
+                'key' => '30-hari',
+                'label' => '30 hari lalu',
+                'items' => collect(),
+            ],
+            [
+                'key' => '1-tahun',
+                'label' => '1 tahun lalu',
+                'items' => collect(),
+            ],
+            [
+                'key' => 'lebih-1-tahun',
+                'label' => 'Lebih dari 1 tahun',
+                'items' => collect(),
+            ],
+        ];
+
+        foreach ($items as $item) {
+            $date = $dateResolver($item);
+            if (! $date) {
+                $buckets[3]['items']->push($item);
+                continue;
+            }
+
+            $ageDays = Carbon::parse($date)->diffInDays($now);
+
+            if ($ageDays <= 7) {
+                $buckets[0]['items']->push($item);
+            } elseif ($ageDays <= 30) {
+                $buckets[1]['items']->push($item);
+            } elseif ($ageDays <= 365) {
+                $buckets[2]['items']->push($item);
+            } else {
+                $buckets[3]['items']->push($item);
+            }
+        }
+
+        return $buckets;
     }
 
     // Menampilkan riwayat penalti

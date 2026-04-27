@@ -4,7 +4,7 @@
     $isPeminjamPage = ($pageType ?? 'peminjam') === 'peminjam';
 @endphp
 
-@section('page_title', $isPeminjamPage ? 'User Peminjam' : 'User Admin & Verifikator')
+@section('page_title', $isPeminjamPage ? 'User Peminjam' : 'User Admin')
 @section('page_subtitle', $isPeminjamPage ? 'Kelola akun mahasiswa peminjam' : 'Kelola akun internal sistem')
 
 @section('content')
@@ -15,12 +15,12 @@
             Dashboard
         </a>
         <span>/</span>
-        <span>{{ $isPeminjamPage ? 'User Peminjam' : 'User Admin & Verifikator' }}</span>
+        <span>{{ $isPeminjamPage ? 'User Peminjam' : 'User Admin' }}</span>
     </div>
 
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h2 class="text-2xl font-bold text-slate-900"><i class="fas {{ $isPeminjamPage ? 'fa-user-graduate' : 'fa-user-shield' }} text-blue-600 mr-2"></i>{{ $isPeminjamPage ? 'User Peminjam' : 'User Admin & Verifikator' }}</h2>
+            <h2 class="text-2xl font-bold text-slate-900"><i class="fas {{ $isPeminjamPage ? 'fa-user-graduate' : 'fa-user-shield' }} text-blue-600 mr-2"></i>{{ $isPeminjamPage ? 'User Peminjam' : 'User Admin' }}</h2>
             <p class="mt-1 text-sm text-slate-500">Kelola user dan role di sistem</p>
         </div>
         <div class="flex gap-2">
@@ -39,34 +39,64 @@
         </div>
     @endif
 
+    <form method="GET" class="mb-4 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-3">
+        <div>
+            <label for="sort_by" class="mb-1 block text-xs font-semibold text-slate-600">Urutkan Berdasarkan</label>
+            <select id="sort_by" name="sort_by" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500">
+                @if($isPeminjamPage)
+                    <option value="name" {{ ($sortBy ?? 'name') === 'name' ? 'selected' : '' }}>Nama</option>
+                    <option value="email" {{ ($sortBy ?? 'name') === 'email' ? 'selected' : '' }}>Email</option>
+                    <option value="created_at" {{ ($sortBy ?? 'name') === 'created_at' ? 'selected' : '' }}>Dibuat</option>
+                    <option value="penalty_points" {{ ($sortBy ?? 'name') === 'penalty_points' ? 'selected' : '' }}>Penalti</option>
+                @else
+                    <option value="name" {{ ($sortBy ?? 'name') === 'name' ? 'selected' : '' }}>Nama</option>
+                    <option value="email" {{ ($sortBy ?? 'name') === 'email' ? 'selected' : '' }}>Email</option>
+                    <option value="role" {{ ($sortBy ?? 'name') === 'role' ? 'selected' : '' }}>Role</option>
+                    <option value="created_at" {{ ($sortBy ?? 'name') === 'created_at' ? 'selected' : '' }}>Dibuat</option>
+                @endif
+            </select>
+        </div>
+        <div>
+            <label for="sort_order" class="mb-1 block text-xs font-semibold text-slate-600">Urutan</label>
+            <select id="sort_order" name="sort_order" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500">
+                <option value="asc" {{ ($sortOrder ?? 'asc') === 'asc' ? 'selected' : '' }}>Ascending (↑)</option>
+                <option value="desc" {{ ($sortOrder ?? 'asc') === 'desc' ? 'selected' : '' }}>Descending (↓)</option>
+            </select>
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900">
+                <i class="fas fa-sort mr-1"></i> Urutkan
+            </button>
+        </div>
+    </form>
+
     @php
         $threshold = $penaltyBlockThreshold ?? 20;
     @endphp
 
     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div class="overflow-x-auto">
-            <table class="w-full">
+            <table class="w-full min-w-[1080px]">
                 <thead class="bg-slate-50">
                     <tr>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Nama</th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Email</th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Role</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Nama</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Email</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Role</th>
                         @if($isPeminjamPage)
-                            <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Status</th>
-                            <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Penalti</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Status</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Penalti</th>
                         @endif
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Dibuat</th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Aksi</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Dibuat</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200">
+                <tbody class="divide-y divide-slate-200">
                     @forelse($users as $user)
                         @php
                             $isBlockedByPenalty = $isPeminjamPage && (int) $user->penalty_points > $threshold;
                             $isBlocked = $isPeminjamPage && ($user->blocked_at || $isBlockedByPenalty);
                             $roleBadgeClass = match ($user->role) {
                                 'admin' => 'bg-rose-100 text-rose-800',
-                                'verifikator' => 'bg-amber-100 text-amber-800',
                                 default => 'bg-blue-100 text-blue-800',
                             };
 
@@ -75,24 +105,24 @@
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : ((int) $user->penalty_points > $threshold || $user->blocked_at ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800');
                         @endphp
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 font-semibold text-gray-800">{{ $user->name }}</td>
-                            <td class="px-6 py-4 text-gray-600">{{ $user->email }}</td>
-                            <td class="px-6 py-4">
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-6 py-3.5 text-sm font-semibold text-slate-800">{{ $user->name }}</td>
+                            <td class="px-6 py-3.5 text-sm text-slate-600">{{ $user->email }}</td>
+                            <td class="px-6 py-3.5 text-sm">
                                 <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold {{ $roleBadgeClass }}">{{ ucfirst($user->role) }}</span>
                             </td>
                             @if($isPeminjamPage)
-                                <td class="px-6 py-4">
+                                <td class="px-6 py-3.5 text-sm">
                                     <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold {{ $accountStatusClass }}">
                                         {{ $isBlocked ? 'Tidak Aktif' : 'Aktif' }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4">
+                                <td class="px-6 py-3.5 text-sm">
                                     <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold {{ $penaltyBadgeClass }}">{{ (int) $user->penalty_points }} poin</span>
                                 </td>
                             @endif
-                            <td class="px-6 py-4 text-sm text-gray-600">{{ $user->created_at->format('d M Y H:i') }}</td>
-                            <td class="px-6 py-4 {{ $isPeminjamPage ? '' : 'whitespace-nowrap' }}">
+                            <td class="px-6 py-3.5 text-sm text-slate-600">{{ $user->created_at->format('d M Y H:i') }}</td>
+                            <td class="px-6 py-3.5 {{ $isPeminjamPage ? '' : 'whitespace-nowrap' }}">
                                 @if($isPeminjamPage)
                                     <button type="button" onclick="toggleBorrowerActionRow({{ $user->id }})" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100" title="Lihat detail & aksi {{ $user->name }}" aria-label="Lihat detail & aksi {{ $user->name }}">
                                         <i class="fas fa-eye"></i>
@@ -198,7 +228,7 @@
                         @endif
                     @empty
                         <tr>
-                            <td colspan="{{ $isPeminjamPage ? 7 : 5 }}" class="px-6 py-8 text-center text-gray-600">
+                            <td colspan="{{ $isPeminjamPage ? 7 : 5 }}" class="px-6 py-8 text-center text-sm text-slate-500">
                                 <i class="fas fa-users mr-2"></i> Belum ada user terdaftar
                             </td>
                         </tr>

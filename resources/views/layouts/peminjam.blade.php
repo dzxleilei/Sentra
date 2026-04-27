@@ -5,6 +5,62 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Peminjam - Sentra Booking')</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('sentra-theme') || 'light';
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            } catch (error) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <style>[x-cloak]{display:none !important;}</style>
+    <style>
+        html[data-theme="dark"] body {
+            background-color: #0b1220;
+            color: #e2e8f0;
+        }
+
+        html[data-theme="dark"] .bg-white {
+            background-color: #111827 !important;
+        }
+
+        html[data-theme="dark"] .bg-slate-50,
+        html[data-theme="dark"] .bg-gray-50 {
+            background-color: #0f172a !important;
+        }
+
+        html[data-theme="dark"] .border-slate-200,
+        html[data-theme="dark"] .border-gray-200,
+        html[data-theme="dark"] .border-slate-300 {
+            border-color: #334155 !important;
+        }
+
+        html[data-theme="dark"] .text-slate-900,
+        html[data-theme="dark"] .text-gray-900,
+        html[data-theme="dark"] .text-gray-800,
+        html[data-theme="dark"] .text-slate-800 {
+            color: #f1f5f9 !important;
+        }
+
+        html[data-theme="dark"] .text-slate-700,
+        html[data-theme="dark"] .text-gray-700,
+        html[data-theme="dark"] .text-slate-600,
+        html[data-theme="dark"] .text-gray-600,
+        html[data-theme="dark"] .text-slate-500,
+        html[data-theme="dark"] .text-gray-500 {
+            color: #cbd5e1 !important;
+        }
+
+        html[data-theme="dark"] input,
+        html[data-theme="dark"] select,
+        html[data-theme="dark"] textarea {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+            border-color: #334155 !important;
+        }
+    </style>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
@@ -71,9 +127,27 @@
         </div>
     </div>
 
-    @stack('scripts')
-
     <script>
+        window.SentraTheme = {
+            get: function () {
+                try {
+                    return localStorage.getItem('sentra-theme') || 'light';
+                } catch (error) {
+                    return 'light';
+                }
+            },
+            set: function (theme) {
+                var safeTheme = theme === 'dark' ? 'dark' : 'light';
+                try {
+                    localStorage.setItem('sentra-theme', safeTheme);
+                } catch (error) {
+                    // Ignore storage error, but still apply theme for current session.
+                }
+                document.documentElement.setAttribute('data-theme', safeTheme);
+                return safeTheme;
+            }
+        };
+
         (function () {
             const headerClock = document.getElementById('header-live-clock');
 
@@ -132,5 +206,132 @@
             tick();
         })();
     </script>
+
+    <script>
+        (function setupDamageReportImageCompression() {
+            const targetActionSuffix = '/report-damage';
+            const maxUploadBytes = 1800 * 1024;
+            const maxWidth = 1600;
+
+            function blobToImage(blob) {
+                return new Promise(function (resolve, reject) {
+                    const url = URL.createObjectURL(blob);
+                    const image = new Image();
+                    image.onload = function () {
+                        URL.revokeObjectURL(url);
+                        resolve(image);
+                    };
+                    image.onerror = function () {
+                        URL.revokeObjectURL(url);
+                        reject(new Error('Gagal memuat gambar.'));
+                    };
+                    image.src = url;
+                });
+            }
+
+            async function compressImageFile(file) {
+                const image = await blobToImage(file);
+                const scale = image.width > maxWidth ? (maxWidth / image.width) : 1;
+                const width = Math.max(1, Math.round(image.width * scale));
+                const height = Math.max(1, Math.round(image.height * scale));
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+
+                const context = canvas.getContext('2d');
+                if (!context) {
+                    throw new Error('Browser tidak mendukung kompresi gambar.');
+                }
+
+                context.drawImage(image, 0, 0, width, height);
+
+                let quality = 0.85;
+                let resultBlob = null;
+
+                while (quality >= 0.4) {
+                    // eslint-disable-next-line no-await-in-loop
+                    resultBlob = await new Promise(function (resolve) {
+                        canvas.toBlob(function (blob) {
+                            resolve(blob);
+                        }, 'image/jpeg', quality);
+                    });
+
+                    if (!resultBlob) {
+                        break;
+                    }
+
+                    if (resultBlob.size <= maxUploadBytes) {
+                        break;
+                    }
+
+                    quality -= 0.1;
+                }
+
+                if (!resultBlob) {
+                    throw new Error('Gagal mengompres gambar.');
+                }
+
+                return new File([
+                    resultBlob
+                ], 'foto-bukti.jpg', {
+                    type: 'image/jpeg',
+                    lastModified: Date.now(),
+                });
+            }
+
+            function shouldHandleForm(form) {
+                const action = (form.getAttribute('action') || '').trim();
+                return action.endsWith(targetActionSuffix) || action.includes(targetActionSuffix + '?');
+            }
+
+            document.addEventListener('submit', async function (event) {
+                const form = event.target;
+                if (!(form instanceof HTMLFormElement) || !shouldHandleForm(form)) {
+                    return;
+                }
+
+                if (form.dataset.damageCompressing === '1') {
+                    return;
+                }
+
+                const input = form.querySelector('input[type="file"][name="foto_bukti"]');
+                if (!input || !input.files || input.files.length === 0) {
+                    return;
+                }
+
+                const originalFile = input.files[0];
+                if (!originalFile || originalFile.size <= maxUploadBytes) {
+                    return;
+                }
+
+                event.preventDefault();
+                form.dataset.damageCompressing = '1';
+
+                const submitButtons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+                submitButtons.forEach(function (button) {
+                    button.setAttribute('disabled', 'disabled');
+                });
+
+                try {
+                    const compressedFile = await compressImageFile(originalFile);
+                    const transfer = new DataTransfer();
+                    transfer.items.add(compressedFile);
+                    input.files = transfer.files;
+
+                    form.submit();
+                } catch (error) {
+                    form.dataset.damageCompressing = '0';
+                    submitButtons.forEach(function (button) {
+                        button.removeAttribute('disabled');
+                    });
+
+                    alert('Foto terlalu besar dan gagal dikompres otomatis. Silakan ambil ulang foto dengan resolusi lebih rendah.');
+                }
+            }, true);
+        })();
+    </script>
+
+    @stack('scripts')
 </body>
 </html>

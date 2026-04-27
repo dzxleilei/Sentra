@@ -5,7 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Admin - Sentra Booking</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        (function () {
+            try {
+                var savedTheme = localStorage.getItem('sentra-theme') || 'light';
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            } catch (error) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
     <style>[x-cloak]{display:none !important;}</style>
+    <style>
+        html[data-theme="dark"] body {
+            background-color: #0b1220;
+            color: #e2e8f0;
+        }
+
+        html[data-theme="dark"] .bg-white {
+            background-color: #111827 !important;
+        }
+
+        html[data-theme="dark"] .bg-slate-50,
+        html[data-theme="dark"] .bg-gray-50 {
+            background-color: #0f172a !important;
+        }
+
+        html[data-theme="dark"] .border-slate-200,
+        html[data-theme="dark"] .border-gray-200,
+        html[data-theme="dark"] .border-slate-300 {
+            border-color: #334155 !important;
+        }
+
+        html[data-theme="dark"] .text-slate-900,
+        html[data-theme="dark"] .text-gray-900,
+        html[data-theme="dark"] .text-gray-800,
+        html[data-theme="dark"] .text-slate-800 {
+            color: #f1f5f9 !important;
+        }
+
+        html[data-theme="dark"] .text-slate-700,
+        html[data-theme="dark"] .text-gray-700,
+        html[data-theme="dark"] .text-slate-600,
+        html[data-theme="dark"] .text-gray-600,
+        html[data-theme="dark"] .text-slate-500,
+        html[data-theme="dark"] .text-gray-500 {
+            color: #cbd5e1 !important;
+        }
+
+        html[data-theme="dark"] input,
+        html[data-theme="dark"] select,
+        html[data-theme="dark"] textarea {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+            border-color: #334155 !important;
+        }
+
+        html[data-theme="dark"] .hover\:bg-slate-100:hover,
+        html[data-theme="dark"] .hover\:bg-gray-50:hover,
+        html[data-theme="dark"] .hover\:bg-blue-100:hover,
+        html[data-theme="dark"] .hover\:bg-rose-100:hover {
+            background-color: #1e293b !important;
+        }
+    </style>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
@@ -25,11 +87,11 @@
                 </a>
                 <div class="my-4 border-t border-slate-200"></div>
                 <p class="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Kelola Sarana</p>
-                <a href="<?php echo e(route('admin.ruangan')); ?>" class="block rounded-xl px-4 py-3 text-sm font-semibold transition <?php echo e(request()->routeIs('admin.ruangan*') ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100'); ?>">
-                    <i class="fas fa-door-open mr-2"></i> Manajemen Ruangan
-                </a>
                 <a href="<?php echo e(route('admin.barang')); ?>" class="block rounded-xl px-4 py-3 text-sm font-semibold transition <?php echo e(request()->routeIs('admin.barang*') ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100'); ?>">
                     <i class="fas fa-boxes mr-2"></i> Manajemen Barang
+                </a>
+                <a href="<?php echo e(route('admin.ruangan')); ?>" class="block rounded-xl px-4 py-3 text-sm font-semibold transition <?php echo e(request()->routeIs('admin.ruangan*') ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100'); ?>">
+                    <i class="fas fa-door-open mr-2"></i> Manajemen Ruangan
                 </a>
 
                 <div class="my-4 border-t border-slate-200"></div>
@@ -38,14 +100,11 @@
                     <i class="fas fa-user-graduate mr-2"></i> User Peminjam
                 </a>
                 <a href="<?php echo e(route('admin.user.staff')); ?>" class="block rounded-xl px-4 py-3 text-sm font-semibold transition <?php echo e(request()->routeIs('admin.user.staff') ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100'); ?>">
-                    <i class="fas fa-user-shield mr-2"></i> User Admin & Verifikator
+                    <i class="fas fa-user-shield mr-2"></i> User Admin
                 </a>
 
                 <div class="my-4 border-t border-slate-200"></div>
                 <p class="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Monitoring</p>
-                <a href="<?php echo e(route('admin.notifikasi.booking')); ?>" class="block rounded-xl px-4 py-3 text-sm font-semibold transition <?php echo e(request()->routeIs('admin.notifikasi.booking') || request()->routeIs('admin.verifikasi.*') ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100'); ?>">
-                    <i class="fas fa-check-circle mr-2"></i> Verifikasi Booking
-                </a>
                 <a href="<?php echo e(route('admin.laporan')); ?>" class="block rounded-xl px-4 py-3 text-sm font-semibold transition <?php echo e(request()->routeIs('admin.laporan') || request()->routeIs('admin.laporan.tiket') ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100'); ?>">
                     <i class="fas fa-chart-bar mr-2"></i> Laporan Peminjaman
                 </a>
@@ -99,6 +158,26 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
     <script>
+    window.SentraTheme = {
+        get: function () {
+            try {
+                return localStorage.getItem('sentra-theme') || 'light';
+            } catch (error) {
+                return 'light';
+            }
+        },
+        set: function (theme) {
+            var safeTheme = theme === 'dark' ? 'dark' : 'light';
+            try {
+                localStorage.setItem('sentra-theme', safeTheme);
+            } catch (error) {
+                // Ignore storage error, but still apply theme for current session.
+            }
+            document.documentElement.setAttribute('data-theme', safeTheme);
+            return safeTheme;
+        }
+    };
+
     function openLogoutModal() {
         const modal = document.getElementById('logout-modal');
         modal.classList.remove('hidden');
@@ -111,6 +190,8 @@
         modal.classList.add('hidden');
     }
     </script>
+
+    <?php echo $__env->yieldPushContent('scripts'); ?>
 </body>
 </html>
 <?php /**PATH D:\Projects\Sentra\resources\views/layouts/admin.blade.php ENDPATH**/ ?>

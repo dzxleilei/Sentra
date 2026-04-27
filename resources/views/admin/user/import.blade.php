@@ -47,10 +47,9 @@
             <p class="text-blue-800 text-sm mb-3">File CSV harus memiliki format seperti berikut (tanpa header):</p>
             <div class="bg-white p-3 rounded border border-blue-200 font-mono text-xs overflow-x-auto">
                 <p>Budi Santoso,budi@example.com,password123,peminjam</p>
-                <p>Rina Wijaya,rina@example.com,password456,verifikator</p>
                 <p>Admin User,admin@example.com,adminpass,admin</p>
             </div>
-            <p class="text-blue-800 text-sm mt-3">Kolom: Nama, Email, Password, Role (admin/verifikator/peminjam)</p>
+            <p class="text-blue-800 text-sm mt-3">Kolom: Nama, Email, Password, Role (admin/peminjam)</p>
         </div>
 
         <!-- Upload Form -->

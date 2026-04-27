@@ -36,7 +36,7 @@
                         {{ $item->thing->nama ?? '-' }}
                     @endif
                 </h3>
-                <p class="mt-2 text-sm text-rose-800">{{ $item->catatan_pelanggaran ?: 'Pelanggaran tercatat oleh verifikator/admin.' }}</p>
+                <p class="mt-2 text-sm text-rose-800">{{ $item->catatan_pelanggaran ?: 'Pelanggaran tercatat oleh admin.' }}</p>
                 <div class="mt-2 flex flex-wrap gap-2">
                     @if($item->status_checkin)
                         <span class="rounded-full px-2 py-1 text-xs font-semibold {{ $checkinBadge[$item->status_checkin] ?? 'bg-slate-100 text-slate-700' }}">{{ $item->status_checkin }}</span>

@@ -4,7 +4,7 @@
     $isPeminjamPage = ($pageType ?? 'peminjam') === 'peminjam';
 ?>
 
-<?php $__env->startSection('page_title', $isPeminjamPage ? 'User Peminjam' : 'User Admin & Verifikator'); ?>
+<?php $__env->startSection('page_title', $isPeminjamPage ? 'User Peminjam' : 'User Admin'); ?>
 <?php $__env->startSection('page_subtitle', $isPeminjamPage ? 'Kelola akun mahasiswa peminjam' : 'Kelola akun internal sistem'); ?>
 
 <?php $__env->startSection('content'); ?>
@@ -15,12 +15,12 @@
             Dashboard
         </a>
         <span>/</span>
-        <span><?php echo e($isPeminjamPage ? 'User Peminjam' : 'User Admin & Verifikator'); ?></span>
+        <span><?php echo e($isPeminjamPage ? 'User Peminjam' : 'User Admin'); ?></span>
     </div>
 
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h2 class="text-2xl font-bold text-slate-900"><i class="fas <?php echo e($isPeminjamPage ? 'fa-user-graduate' : 'fa-user-shield'); ?> text-blue-600 mr-2"></i><?php echo e($isPeminjamPage ? 'User Peminjam' : 'User Admin & Verifikator'); ?></h2>
+            <h2 class="text-2xl font-bold text-slate-900"><i class="fas <?php echo e($isPeminjamPage ? 'fa-user-graduate' : 'fa-user-shield'); ?> text-blue-600 mr-2"></i><?php echo e($isPeminjamPage ? 'User Peminjam' : 'User Admin'); ?></h2>
             <p class="mt-1 text-sm text-slate-500">Kelola user dan role di sistem</p>
         </div>
         <div class="flex gap-2">
@@ -40,34 +40,64 @@
         </div>
     <?php endif; ?>
 
+    <form method="GET" class="mb-4 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-3">
+        <div>
+            <label for="sort_by" class="mb-1 block text-xs font-semibold text-slate-600">Urutkan Berdasarkan</label>
+            <select id="sort_by" name="sort_by" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500">
+                <?php if($isPeminjamPage): ?>
+                    <option value="name" <?php echo e(($sortBy ?? 'name') === 'name' ? 'selected' : ''); ?>>Nama</option>
+                    <option value="email" <?php echo e(($sortBy ?? 'name') === 'email' ? 'selected' : ''); ?>>Email</option>
+                    <option value="created_at" <?php echo e(($sortBy ?? 'name') === 'created_at' ? 'selected' : ''); ?>>Dibuat</option>
+                    <option value="penalty_points" <?php echo e(($sortBy ?? 'name') === 'penalty_points' ? 'selected' : ''); ?>>Penalti</option>
+                <?php else: ?>
+                    <option value="name" <?php echo e(($sortBy ?? 'name') === 'name' ? 'selected' : ''); ?>>Nama</option>
+                    <option value="email" <?php echo e(($sortBy ?? 'name') === 'email' ? 'selected' : ''); ?>>Email</option>
+                    <option value="role" <?php echo e(($sortBy ?? 'name') === 'role' ? 'selected' : ''); ?>>Role</option>
+                    <option value="created_at" <?php echo e(($sortBy ?? 'name') === 'created_at' ? 'selected' : ''); ?>>Dibuat</option>
+                <?php endif; ?>
+            </select>
+        </div>
+        <div>
+            <label for="sort_order" class="mb-1 block text-xs font-semibold text-slate-600">Urutan</label>
+            <select id="sort_order" name="sort_order" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500">
+                <option value="asc" <?php echo e(($sortOrder ?? 'asc') === 'asc' ? 'selected' : ''); ?>>Ascending (↑)</option>
+                <option value="desc" <?php echo e(($sortOrder ?? 'asc') === 'desc' ? 'selected' : ''); ?>>Descending (↓)</option>
+            </select>
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900">
+                <i class="fas fa-sort mr-1"></i> Urutkan
+            </button>
+        </div>
+    </form>
+
     <?php
         $threshold = $penaltyBlockThreshold ?? 20;
     ?>
 
     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <div class="overflow-x-auto">
-            <table class="w-full">
+            <table class="w-full min-w-[1080px]">
                 <thead class="bg-slate-50">
                     <tr>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Nama</th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Email</th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Role</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Nama</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Email</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Role</th>
                         <?php if($isPeminjamPage): ?>
-                            <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Status</th>
-                            <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Penalti</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Status</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Penalti</th>
                         <?php endif; ?>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Dibuat</th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Aksi</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Dibuat</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200">
+                <tbody class="divide-y divide-slate-200">
                     <?php $__empty_1 = true; $__currentLoopData = $users; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $user): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                         <?php
                             $isBlockedByPenalty = $isPeminjamPage && (int) $user->penalty_points > $threshold;
                             $isBlocked = $isPeminjamPage && ($user->blocked_at || $isBlockedByPenalty);
                             $roleBadgeClass = match ($user->role) {
                                 'admin' => 'bg-rose-100 text-rose-800',
-                                'verifikator' => 'bg-amber-100 text-amber-800',
                                 default => 'bg-blue-100 text-blue-800',
                             };
 
@@ -76,25 +106,25 @@
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : ((int) $user->penalty_points > $threshold || $user->blocked_at ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800');
                         ?>
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 font-semibold text-gray-800"><?php echo e($user->name); ?></td>
-                            <td class="px-6 py-4 text-gray-600"><?php echo e($user->email); ?></td>
-                            <td class="px-6 py-4">
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-6 py-3.5 text-sm font-semibold text-slate-800"><?php echo e($user->name); ?></td>
+                            <td class="px-6 py-3.5 text-sm text-slate-600"><?php echo e($user->email); ?></td>
+                            <td class="px-6 py-3.5 text-sm">
                                 <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <?php echo e($roleBadgeClass); ?>"><?php echo e(ucfirst($user->role)); ?></span>
                             </td>
                             <?php if($isPeminjamPage): ?>
-                                <td class="px-6 py-4">
+                                <td class="px-6 py-3.5 text-sm">
                                     <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <?php echo e($accountStatusClass); ?>">
                                         <?php echo e($isBlocked ? 'Tidak Aktif' : 'Aktif'); ?>
 
                                     </span>
                                 </td>
-                                <td class="px-6 py-4">
+                                <td class="px-6 py-3.5 text-sm">
                                     <span class="inline-flex w-fit rounded-full px-3 py-1 text-xs font-semibold <?php echo e($penaltyBadgeClass); ?>"><?php echo e((int) $user->penalty_points); ?> poin</span>
                                 </td>
                             <?php endif; ?>
-                            <td class="px-6 py-4 text-sm text-gray-600"><?php echo e($user->created_at->format('d M Y H:i')); ?></td>
-                            <td class="px-6 py-4 <?php echo e($isPeminjamPage ? '' : 'whitespace-nowrap'); ?>">
+                            <td class="px-6 py-3.5 text-sm text-slate-600"><?php echo e($user->created_at->format('d M Y H:i')); ?></td>
+                            <td class="px-6 py-3.5 <?php echo e($isPeminjamPage ? '' : 'whitespace-nowrap'); ?>">
                                 <?php if($isPeminjamPage): ?>
                                     <button type="button" onclick="toggleBorrowerActionRow(<?php echo e($user->id); ?>)" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100" title="Lihat detail & aksi <?php echo e($user->name); ?>" aria-label="Lihat detail & aksi <?php echo e($user->name); ?>">
                                         <i class="fas fa-eye"></i>
@@ -201,7 +231,7 @@
                         <?php endif; ?>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <tr>
-                            <td colspan="<?php echo e($isPeminjamPage ? 7 : 5); ?>" class="px-6 py-8 text-center text-gray-600">
+                            <td colspan="<?php echo e($isPeminjamPage ? 7 : 5); ?>" class="px-6 py-8 text-center text-sm text-slate-500">
                                 <i class="fas fa-users mr-2"></i> Belum ada user terdaftar
                             </td>
                         </tr>

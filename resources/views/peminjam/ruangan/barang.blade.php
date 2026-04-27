@@ -82,21 +82,22 @@
                             <div class="mt-2 flex flex-wrap gap-1.5 text-[10px]">
                                 @php
                                     $availableTimes = collect($itemTimeOptions[$item->id] ?? []);
-                                    $allTimes = collect($timeOptions->values());
-                                    $unavailableTimes = $allTimes->reject(fn ($time) => $availableTimes->contains($time));
+                                    $detailTimes = collect($detailTimeOptions->values());
+                                    $nowTime = \Illuminate\Support\Carbon::now()->format('H:i');
                                 @endphp
-                                @forelse($availableTimes as $time)
-                                    <span class="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-800">{{ $time }}</span>
-                                @empty
-                                    <span class="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-500">Tidak ada sesi tersedia</span>
-                                @endforelse
+                                @foreach($detailTimes as $time)
+                                    @php
+                                        $isPast = $time <= $nowTime;
+                                        $isAvailable = $availableTimes->contains($time);
+                                        $timeClass = $isPast
+                                            ? 'bg-slate-200 text-slate-500'
+                                            : ($isAvailable
+                                                ? 'bg-emerald-100 text-emerald-800'
+                                                : 'bg-rose-100 text-rose-800');
+                                    @endphp
+                                    <span class="rounded-full px-2 py-1 font-semibold {{ $timeClass }}">{{ $time }}</span>
+                                @endforeach
                             </div>
-                            @if($unavailableTimes->isNotEmpty())
-                                <div class="mt-3 flex flex-wrap gap-1.5 text-[10px]">
-                                    @foreach($unavailableTimes as $time)
-                                        <span class="rounded-full border border-slate-300 px-2 py-1 font-semibold text-slate-400 line-through">{{ $time }}</span>
-                                    @endforeach
-                                </div>
                             </div>
 
                         <div>

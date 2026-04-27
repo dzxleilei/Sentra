@@ -15,7 +15,7 @@
     <?php endif; ?>
 
     <section class="grid gap-3">
-        <a href="<?php echo e(route('peminjam.riwayat')); ?>" class="group rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 p-4 text-white transition hover:-translate-y-0.5 hover:shadow-lg">
+        <a href="<?php echo e(route('peminjam.riwayat')); ?>" class="group rounded-2xl bg-blue-600 p-4 text-white transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-lg">
             <div class="flex items-start justify-between gap-3">
                 <div>
                     <p class="text-xs uppercase tracking-wider text-blue-100">Tiket Hari Ini</p>
@@ -42,13 +42,9 @@
                     </span>
                 </div>
 
-                <form id="quick-qr-form" action="<?php echo e(route('quick-borrow-qr')); ?>" method="POST" class="mt-4 w-full">
-                    <?php echo csrf_field(); ?>
-                    <input id="quick-qr-code" type="hidden" name="qr_code" value="">
-                    <button id="open-quick-qr-scanner" type="button" class="w-full rounded-xl bg-blue-600 px-2 py-2 text-xs font-semibold text-white disabled:opacity-60 sm:text-sm" <?php echo e($bookingBlocked ? 'disabled' : ''); ?>>
-                        Scan QR <span class="hidden lg:inline">dan Pinjam</span>
-                    </button>
-                </form>
+                <button id="open-quick-qr-scanner" type="button" class="mt-4 w-full rounded-xl bg-blue-600 px-2 py-2 text-xs font-semibold text-white disabled:opacity-60 sm:text-sm" <?php echo e($bookingBlocked ? 'disabled' : ''); ?>>
+                    Scan QR <span class="hidden lg:inline">dan Pinjam / Kembalikan</span>
+                </button>
             </article>
 
             <article class="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -179,17 +175,393 @@
     <?php endif; ?>
 
     <div id="quick-qr-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/70 p-4">
-        <div class="w-full max-w-lg rounded-2xl bg-white p-4">
+        <div class="w-full max-w-2xl rounded-2xl bg-white p-4">
             <div class="flex items-start justify-between gap-3">
                 <div>
                     <h3 class="text-sm font-bold text-slate-900">Scan QR Barang</h3>
-                    <p class="mt-1 text-xs text-slate-500">Arahkan kamera ke QR ID barang untuk pinjam cepat.</p>
+                    <p class="mt-1 text-xs text-slate-500">Scan QR untuk membuka detail barang dan proses pinjam atau kembalikan.</p>
                 </div>
                 <button id="quick-qr-close" type="button" class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700">Tutup</button>
             </div>
-            <div id="quick-qr-reader" class="mt-3 min-h-64 overflow-hidden rounded-lg border border-slate-200 bg-slate-50"></div>
-            <p id="quick-qr-error" class="mt-2 text-xs font-semibold text-rose-700"></p>
+            <div id="quick-qr-scanner-pane" class="mt-3">
+                <div id="quick-qr-reader" class="min-h-64 overflow-hidden rounded-lg border border-slate-200 bg-slate-50"></div>
+                <p id="quick-qr-error" class="mt-2 text-xs font-semibold text-rose-700"></p>
+            </div>
+
+            <div id="quick-qr-preview-pane" class="mt-3 hidden">
+                <div class="grid gap-3 md:grid-cols-2">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Data Diri</p>
+                        <div class="mt-3 space-y-2 text-sm">
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Nama</label>
+                                <input id="quick-qr-user-name" type="text" readonly class="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Email</label>
+                                <input id="quick-qr-user-email" type="text" readonly class="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Detail Barang</p>
+                        <div class="mt-3 space-y-2 text-sm">
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Kode Barang</label>
+                                <input id="quick-qr-thing-code" type="text" readonly class="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Nama Barang</label>
+                                <input id="quick-qr-thing-name" type="text" readonly class="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Lokasi</label>
+                                <input id="quick-qr-thing-room" type="text" readonly class="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="quick-qr-process-form" action="<?php echo e(route('quick-borrow-qr.process')); ?>" method="POST" enctype="multipart/form-data" class="mt-4 space-y-3">
+                    <?php echo csrf_field(); ?>
+                    <input id="quick-qr-code" type="hidden" name="qr_code" value="">
+                    <input id="quick-qr-action" type="hidden" name="action" value="borrow">
+
+                    <div id="quick-qr-borrow-fields" class="space-y-3">
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold text-slate-600">Alasan Peminjaman <span class="text-rose-600">*</span></label>
+                            <select id="quick-qr-reason" name="alasan_peminjaman" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                                <option value="Praktikum">Praktikum</option>
+                                <option value="Perkuliahan">Perkuliahan</option>
+                                <option value="Kegiatan Organisasi">Kegiatan Organisasi</option>
+                                <option value="Riset">Riset</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
+                        </div>
+                        <div id="quick-qr-reason-other-wrap" class="hidden">
+                            <label class="mb-1 block text-xs font-semibold text-slate-600">Alasan Lainnya</label>
+                            <textarea id="quick-qr-reason-other" name="alasan_lainnya" rows="2" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Jelaskan alasan pinjam"></textarea>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label id="quick-qr-photo-label" class="mb-1 block text-xs font-semibold text-slate-600">Foto Selfie + Barang <span class="text-rose-600">*</span></label>
+                        <input id="quick-qr-photo" type="file" name="foto_awal" accept="image/*" capture="user" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button id="quick-qr-rescan" type="button" class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700">Scan Ulang</button>
+                        <button id="quick-qr-submit" type="submit" class="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white">Pinjam Sekarang</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 <?php $__env->stopSection(); ?>
+
+<?php $__env->startPush('scripts'); ?>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script>
+        (function setupQuickQrFlow() {
+            const openButton = document.getElementById('open-quick-qr-scanner');
+            const modal = document.getElementById('quick-qr-modal');
+            const closeButton = document.getElementById('quick-qr-close');
+            const rescanButton = document.getElementById('quick-qr-rescan');
+            const scannerPane = document.getElementById('quick-qr-scanner-pane');
+            const previewPane = document.getElementById('quick-qr-preview-pane');
+            const errorEl = document.getElementById('quick-qr-error');
+            const readerId = 'quick-qr-reader';
+            const csrfToken = '<?php echo e(csrf_token()); ?>';
+            const previewUrl = '<?php echo e(route('quick-borrow-qr.preview')); ?>';
+            const processUrl = '<?php echo e(route('quick-borrow-qr.process')); ?>';
+
+            const form = document.getElementById('quick-qr-process-form');
+            const qrCodeInput = document.getElementById('quick-qr-code');
+            const actionInput = document.getElementById('quick-qr-action');
+            const userName = document.getElementById('quick-qr-user-name');
+            const userEmail = document.getElementById('quick-qr-user-email');
+            const thingCode = document.getElementById('quick-qr-thing-code');
+            const thingName = document.getElementById('quick-qr-thing-name');
+            const thingRoom = document.getElementById('quick-qr-thing-room');
+            const borrowFields = document.getElementById('quick-qr-borrow-fields');
+            const reasonSelect = document.getElementById('quick-qr-reason');
+            const reasonOtherWrap = document.getElementById('quick-qr-reason-other-wrap');
+            const reasonOther = document.getElementById('quick-qr-reason-other');
+            const photoInput = document.getElementById('quick-qr-photo');
+            const photoLabel = document.getElementById('quick-qr-photo-label');
+            const submitButton = document.getElementById('quick-qr-submit');
+
+            if (!openButton || !modal || !closeButton || !scannerPane || !previewPane || !errorEl || !form || !photoInput) {
+                return;
+            }
+
+            let scanner = null;
+
+            function setMode(mode) {
+                if (mode === 'checkout') {
+                    actionInput.value = 'checkout';
+                    borrowFields.classList.add('hidden');
+                    photoInput.name = 'foto_akhir';
+                    photoLabel.textContent = 'Foto Selfie + Barang Kembali *';
+                    submitButton.textContent = 'Kembalikan';
+                } else {
+                    actionInput.value = 'borrow';
+                    borrowFields.classList.remove('hidden');
+                    photoInput.name = 'foto_awal';
+                    photoLabel.textContent = 'Foto Selfie + Barang *';
+                    submitButton.textContent = 'Pinjam Sekarang';
+                }
+            }
+
+            function setFormVisible(previewVisible) {
+                if (previewVisible) {
+                    scannerPane.classList.add('hidden');
+                    previewPane.classList.remove('hidden');
+                } else {
+                    previewPane.classList.add('hidden');
+                    scannerPane.classList.remove('hidden');
+                }
+            }
+
+            async function stopScanner() {
+                if (!scanner) {
+                    return;
+                }
+
+                try {
+                    await scanner.stop();
+                } catch (error) {
+                    // noop
+                }
+
+                try {
+                    await scanner.clear();
+                } catch (error) {
+                    // noop
+                }
+
+                scanner = null;
+            }
+
+            async function openScanner() {
+                if (!window.Html5Qrcode) {
+                    errorEl.textContent = 'Library scanner belum siap. Coba muat ulang halaman.';
+                    return;
+                }
+
+                errorEl.textContent = '';
+                setFormVisible(false);
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+
+                scanner = new Html5Qrcode(readerId);
+
+                try {
+                    let cameraConfig = { facingMode: 'environment' };
+                    if (window.Html5Qrcode.getCameras) {
+                        const cameras = await window.Html5Qrcode.getCameras();
+                        if (Array.isArray(cameras) && cameras.length > 0) {
+                            const preferred = cameras.find((camera) => /back|rear|environment/i.test(camera.label)) || cameras[0];
+                            cameraConfig = { deviceId: { exact: preferred.id } };
+                        }
+                    }
+
+                    await scanner.start(cameraConfig, { fps: 10, qrbox: 220 }, async function (decodedText) {
+                        const normalized = String(decodedText).trim().toUpperCase();
+                        if (normalized === '') {
+                            errorEl.textContent = 'QR tidak valid.';
+                            return;
+                        }
+
+                        await stopScanner();
+
+                        try {
+                            const response = await fetch(previewUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken,
+                                    'Accept': 'application/json',
+                                },
+                                body: JSON.stringify({ qr_code: normalized }),
+                            });
+
+                            const payload = await response.json();
+                            if (!response.ok) {
+                                throw new Error(payload.message || 'Barang tidak dapat diproses.');
+                            }
+
+                            qrCodeInput.value = normalized;
+                            userName.value = payload.user?.name || '';
+                            userEmail.value = payload.user?.email || '';
+                            thingCode.value = payload.thing?.kode_thing || '';
+                            thingName.value = payload.thing?.nama || '';
+                            thingRoom.value = payload.thing?.room_name
+                                ? payload.thing.room_name + (payload.thing.room_code ? ' (' + payload.thing.room_code + ')' : '')
+                                : 'Tidak ada data lokasi';
+
+                            setMode(payload.mode || 'borrow');
+                            setFormVisible(true);
+                        } catch (error) {
+                            errorEl.textContent = error.message || 'Gagal membuka detail barang.';
+                            modal.classList.add('hidden');
+                            modal.classList.remove('flex');
+                        }
+                    });
+                } catch (error) {
+                    errorEl.textContent = error && error.message ? error.message : 'Kamera gagal dibuka. Pastikan izin kamera diaktifkan.';
+                    await stopScanner();
+                }
+            }
+
+            function closeModal() {
+                stopScanner();
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                errorEl.textContent = '';
+                form.reset();
+                setMode('borrow');
+                setFormVisible(false);
+            }
+
+            function updateReasonState() {
+                if (reasonSelect && reasonOtherWrap) {
+                    if (reasonSelect.value === 'Lainnya') {
+                        reasonOtherWrap.classList.remove('hidden');
+                    } else {
+                        reasonOtherWrap.classList.add('hidden');
+                    }
+                }
+            }
+
+            function loadImageFromFile(file) {
+                return new Promise(function (resolve, reject) {
+                    const url = URL.createObjectURL(file);
+                    const image = new Image();
+                    image.onload = function () {
+                        URL.revokeObjectURL(url);
+                        resolve(image);
+                    };
+                    image.onerror = function () {
+                        URL.revokeObjectURL(url);
+                        reject(new Error('Gagal memuat gambar.'));
+                    };
+                    image.src = url;
+                });
+            }
+
+            async function compressIfNeeded(file) {
+                const maxBytes = 1800 * 1024;
+                if (!file || file.size <= maxBytes) {
+                    return file;
+                }
+
+                const image = await loadImageFromFile(file);
+                const maxWidth = 1600;
+                const ratio = image.width > maxWidth ? (maxWidth / image.width) : 1;
+                const width = Math.max(1, Math.round(image.width * ratio));
+                const height = Math.max(1, Math.round(image.height * ratio));
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+
+                const context = canvas.getContext('2d');
+                if (!context) {
+                    return file;
+                }
+
+                context.drawImage(image, 0, 0, width, height);
+
+                let quality = 0.85;
+                let blob = null;
+
+                while (quality >= 0.4) {
+                    // eslint-disable-next-line no-await-in-loop
+                    blob = await new Promise(function (resolve) {
+                        canvas.toBlob(function (result) {
+                            resolve(result);
+                        }, 'image/jpeg', quality);
+                    });
+
+                    if (!blob) {
+                        break;
+                    }
+
+                    if (blob.size <= maxBytes) {
+                        break;
+                    }
+
+                    quality -= 0.1;
+                }
+
+                if (!blob) {
+                    return file;
+                }
+
+                return new File([blob], 'quick-qr-photo.jpg', {
+                    type: 'image/jpeg',
+                    lastModified: Date.now(),
+                });
+            }
+
+            openButton.addEventListener('click', openScanner);
+            closeButton.addEventListener('click', closeModal);
+            rescanButton.addEventListener('click', async function () {
+                setFormVisible(false);
+                errorEl.textContent = '';
+                await stopScanner();
+                openScanner();
+            });
+
+            modal.addEventListener('click', function (event) {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            if (reasonSelect) {
+                reasonSelect.addEventListener('change', updateReasonState);
+                updateReasonState();
+            }
+
+            form.addEventListener('submit', async function (event) {
+                if (reasonOther && actionInput.value === 'borrow') {
+                    if (reasonSelect && reasonSelect.value !== 'Lainnya') {
+                        reasonOther.value = '';
+                    }
+                }
+
+                if (form.dataset.qrCompressing === '1') {
+                    return;
+                }
+
+                if (!photoInput.files || photoInput.files.length === 0) {
+                    return;
+                }
+
+                try {
+                    event.preventDefault();
+                    form.dataset.qrCompressing = '1';
+                    submitButton.setAttribute('disabled', 'disabled');
+
+                    const compressed = await compressIfNeeded(photoInput.files[0]);
+                    const transfer = new DataTransfer();
+                    transfer.items.add(compressed);
+                    photoInput.files = transfer.files;
+
+                    form.submit();
+                } catch (error) {
+                    form.dataset.qrCompressing = '0';
+                    submitButton.removeAttribute('disabled');
+                    alert('Foto gagal diproses. Coba ambil ulang foto dengan resolusi lebih rendah.');
+                }
+            });
+
+            setMode('borrow');
+            setFormVisible(false);
+        })();
+    </script>
+<?php $__env->stopPush(); ?>
 <?php echo $__env->make('layouts.peminjam', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\Projects\Sentra\resources\views/peminjam/dashboard.blade.php ENDPATH**/ ?>

@@ -43,8 +43,6 @@ class AuthController extends Controller
                         $user->forceFill(['blocked_at' => now()])->save();
                     }
                     return redirect()->route('admin.dashboard');
-                case 'verifikator':
-                    return redirect()->route('verifikator.dashboard');
                 case 'peminjam':
                 default:
                     $threshold = AppSetting::integer('penalty_block_threshold', 20);

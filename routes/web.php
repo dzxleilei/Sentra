@@ -4,7 +4,6 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BorrowController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboard;
-use App\Http\Controllers\Verifikator\DashboardController as VerifikatorDashboard;
 use App\Http\Controllers\Peminjam\DashboardController as PeminjamDashboard;
 
 Route::get("/", function () {
@@ -50,22 +49,14 @@ Route::middleware(["auth"])->group(function () {
         
         Route::get("/borrow-room", [BorrowController::class, "listRooms"])->name("room.list");
         Route::post("/booking-room", [BorrowController::class, "bookingRoom"])->name("room.booking");
+        Route::post('/quick-borrow-qr/preview', [BorrowController::class, 'previewQuickBorrowQr'])->name('quick-borrow-qr.preview');
+        Route::post('/quick-borrow-qr/process', [BorrowController::class, 'processQuickBorrowQr'])->name('quick-borrow-qr.process');
         
         Route::get("/room/{id}/things", [BorrowController::class, "listThingsRoom"])->name("room.things.list");
         Route::post("/booking-things-room", [BorrowController::class, "bookingThingsRoom"])->name("room.things.booking");
 
         Route::post("/checkin", [BorrowController::class, "checkIn"])->name("borrow.checkin");
         Route::post("/checkout", [BorrowController::class, "checkOut"])->name("borrow.checkout");
-    });
-
-    // ===== VERIFIKATOR ROUTES =====
-    Route::middleware('role:verifikator')->prefix('verifikator')->name('verifikator.')->group(function () {
-        Route::get('/dashboard', [VerifikatorDashboard::class, 'index'])->name('dashboard');
-        Route::get('/booking/{id}', [VerifikatorDashboard::class, 'detailBooking'])->name('booking.detail');
-        Route::post('/validasi-scan/{id}', [VerifikatorDashboard::class, 'validasiScan'])->name('validasi.scan');
-        Route::get('/laporan-pelanggaran', [VerifikatorDashboard::class, 'laporanPelanggaran'])->name('pelanggaran');
-        Route::get('/notifikasi', [VerifikatorDashboard::class, 'notifikasi'])->name('notifikasi');
-        Route::get('/faq', [VerifikatorDashboard::class, 'faq'])->name('faq');
     });
 
     // ===== ADMIN ROUTES =====
@@ -106,23 +97,23 @@ Route::middleware(["auth"])->group(function () {
         Route::get('/user/import', [AdminDashboard::class, 'importUserCSV'])->name('user.import');
         Route::post('/user/import', [AdminDashboard::class, 'importUserCSV']);
         
-        // Manajemen Penalti
-        Route::get('/pelanggaran', [AdminDashboard::class, 'daftarPelanggaran'])->name('pelanggaran');
-        Route::post('/pelanggaran/{id}/tindak-lanjut', [AdminDashboard::class, 'tindakLanjutPelanggaran'])->name('pelanggaran.tindak');
-        Route::post('/pelanggaran/tambah', [AdminDashboard::class, 'tambahPenaltiPeminjam'])->name('pelanggaran.tambah');
-        Route::post('/pelanggaran/{userId}/set', [AdminDashboard::class, 'setPenaltiPeminjam'])->name('pelanggaran.set');
-        Route::post('/pelanggaran/{userId}/reset', [AdminDashboard::class, 'resetPenaltiPeminjam'])->name('pelanggaran.reset');
+        // Manajemen Penalti (dipusatkan lewat halaman laporan)
+        Route::post('/laporan/pelanggaran/{id}/tindak-lanjut', [AdminDashboard::class, 'tindakLanjutPelanggaran'])->name('pelanggaran.tindak');
+        Route::post('/laporan/pelanggaran/tambah', [AdminDashboard::class, 'tambahPenaltiPeminjam'])->name('pelanggaran.tambah');
+        Route::post('/laporan/pelanggaran/{userId}/set', [AdminDashboard::class, 'setPenaltiPeminjam'])->name('pelanggaran.set');
+        Route::post('/laporan/pelanggaran/{userId}/reset', [AdminDashboard::class, 'resetPenaltiPeminjam'])->name('pelanggaran.reset');
         
         // Laporan
         Route::get('/laporan', [AdminDashboard::class, 'laporan'])->name('laporan');
         Route::get('/laporan/{userId}/tiket', [AdminDashboard::class, 'laporanTiketUser'])->name('laporan.tiket');
+        Route::get('/laporan/tiket/{id}/foto/{jenis}', [AdminDashboard::class, 'laporanTiketFoto'])
+            ->whereIn('jenis', ['awal', 'akhir'])
+            ->name('laporan.tiket.foto');
         Route::get('/laporan-rusak', [AdminDashboard::class, 'laporanRusak'])->name('laporan.rusak');
+        Route::get('/laporan-rusak/{id}', [AdminDashboard::class, 'laporanRusakDetail'])->name('laporan.rusak.detail');
+        Route::get('/laporan-rusak/{id}/foto', [AdminDashboard::class, 'laporanRusakFoto'])->name('laporan.rusak.foto');
+        Route::post('/laporan-rusak/{id}/status', [AdminDashboard::class, 'updateLaporanRusakStatus'])->name('laporan.rusak.status');
         Route::post('/laporan/export', [AdminDashboard::class, 'exportLaporan'])->name('laporan.export');
-        
-        // Fitur Verifikator
-        Route::get('/verifikasi/notifikasi', [AdminDashboard::class, 'notifikasiBooking'])->name('notifikasi.booking');
-        Route::get('/verifikasi/booking/{id}', [AdminDashboard::class, 'detailBookingVerifikasi'])->name('verifikasi.booking');
-        Route::post('/verifikasi/booking/{id}', [AdminDashboard::class, 'validasiScanBooking'])->name('verifikasi.scan');
         
         // FAQ
         Route::get('/faq', [AdminDashboard::class, 'faq'])->name('faq');

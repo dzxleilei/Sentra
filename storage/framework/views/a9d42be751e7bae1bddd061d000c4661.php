@@ -54,7 +54,22 @@
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
             </select>
         </div>
-        <div class="md:col-span-4 flex gap-2">
+        <div>
+            <label for="sort_by" class="mb-1 block text-xs font-semibold text-slate-600">Urutkan Berdasarkan</label>
+            <select id="sort_by" name="sort_by" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500">
+                <option value="kode_thing" <?php echo e(($sortBy ?? 'kode_thing') === 'kode_thing' ? 'selected' : ''); ?>>Kode Barang</option>
+                <option value="nama" <?php echo e(($sortBy ?? 'kode_thing') === 'nama' ? 'selected' : ''); ?>>Nama Barang</option>
+                <option value="status" <?php echo e(($sortBy ?? 'kode_thing') === 'status' ? 'selected' : ''); ?>>Status</option>
+            </select>
+        </div>
+        <div>
+            <label for="sort_order" class="mb-1 block text-xs font-semibold text-slate-600">Urutan</label>
+            <select id="sort_order" name="sort_order" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500">
+                <option value="asc" <?php echo e(($sortOrder ?? 'asc') === 'asc' ? 'selected' : ''); ?>>Ascending (↑)</option>
+                <option value="desc" <?php echo e(($sortOrder ?? 'asc') === 'desc' ? 'selected' : ''); ?>>Descending (↓)</option>
+            </select>
+        </div>
+        <div class="md:col-span-6 flex gap-2">
             <button type="submit" class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900">
                 <i class="fas fa-filter mr-1"></i> Terapkan
             </button>
@@ -63,33 +78,34 @@
     </form>
 
     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <table class="w-full">
+        <div class="overflow-x-auto">
+        <table class="w-full min-w-[960px]">
             <thead class="bg-slate-50">
                 <tr>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Kode Barang</th>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Nama Barang</th>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Lokasi</th>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Status</th>
-                    <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Aksi</th>
+                    <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Kode Barang</th>
+                    <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Nama Barang</th>
+                    <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Lokasi</th>
+                    <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Status</th>
+                    <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Aksi</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
+            <tbody class="divide-y divide-slate-200">
                 <?php $__empty_1 = true; $__currentLoopData = $barang; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 text-sm font-mono text-gray-600"><?php echo e($item->kode_thing); ?></td>
-                        <td class="px-6 py-4 text-sm text-gray-700"><?php echo e($item->nama); ?></td>
-                        <td class="px-6 py-4 text-sm text-gray-600">
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-6 py-3.5 text-sm font-mono text-slate-700"><?php echo e($item->kode_thing); ?></td>
+                        <td class="px-6 py-3.5 text-sm text-slate-700"><?php echo e($item->nama); ?></td>
+                        <td class="px-6 py-3.5 text-sm text-slate-600">
                             <?php echo e($item->room?->nama ?? '-'); ?>
 
                         </td>
-                        <td class="px-6 py-4 text-sm">
+                        <td class="px-6 py-3.5 text-sm">
                             <span class="inline-block rounded-full px-3 py-1 text-xs font-semibold
                                 <?php echo e($item->status === 'Tersedia' ? 'bg-emerald-100 text-emerald-800' : ($item->status === 'Tidak Tersedia' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800')); ?>">
                                 <?php echo e($item->status); ?>
 
                             </span>
                         </td>
-                        <td class="px-6 py-4 text-sm whitespace-nowrap">
+                        <td class="px-6 py-3.5 text-sm whitespace-nowrap">
                             <div class="flex items-center gap-2">
                                 <a href="<?php echo e(route('admin.barang.edit', $item->id)); ?>" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100" title="Edit <?php echo e($item->nama); ?>" aria-label="Edit <?php echo e($item->nama); ?>">
                                     <i class="fas fa-pen-to-square"></i>
@@ -108,13 +124,14 @@
                     </tr>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                     <tr>
-                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="5" class="px-6 py-8 text-center text-sm text-slate-500">
                             <i class="fas fa-box-open mr-2"></i>Belum ada data barang
                         </td>
                     </tr>
                 <?php endif; ?>
             </tbody>
         </table>
+        </div>
     </div>
 
     <div class="mt-6 flex justify-center">

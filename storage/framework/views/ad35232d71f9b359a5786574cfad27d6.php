@@ -1,12 +1,12 @@
-@extends('layouts.admin')
 
-@section('page_title', 'FAQ')
-@section('page_subtitle', 'Pertanyaan umum seputar pengelolaan sistem')
 
-@section('content')
+<?php $__env->startSection('page_title', 'FAQ'); ?>
+<?php $__env->startSection('page_subtitle', 'Pertanyaan umum seputar pengelolaan sistem'); ?>
+
+<?php $__env->startSection('content'); ?>
 <div class="max-w-7xl p-2">
     <div class="mb-3 flex items-center gap-2 text-xs text-slate-500">
-        <a href="{{ route('admin.dashboard') }}" class="inline-flex items-center gap-1 hover:text-blue-600">
+        <a href="<?php echo e(route('admin.dashboard')); ?>" class="inline-flex items-center gap-1 hover:text-blue-600">
             <i class="fas fa-arrow-left"></i>
             Dashboard
         </a>
@@ -125,4 +125,6 @@ function toggleFAQ(button) {
     icon.classList.toggle('rotate-180');
 }
 </script>
-@endsection
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.admin', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\Projects\Sentra\resources\views/admin/faq.blade.php ENDPATH**/ ?>

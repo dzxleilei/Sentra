@@ -80,11 +80,12 @@ unset($__errorArgs, $__bag); ?>
             <!-- Lokasi Ruangan -->
             <div class="mb-6">
                 <label for="room_id" class="mb-2 block text-sm font-semibold text-slate-700">
-                    Lokasi Ruangan (Opsional)
+                    Lokasi Ruangan <span class="text-red-600">*</span>
                 </label>
                 <select id="room_id" name="room_id" 
-                    class="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">-- Tidak terkait ruangan --</option>
+                    class="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required>
+                    <option value="">-- Pilih Ruangan --</option>
                     <?php $__currentLoopData = $ruangan; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $room): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <option value="<?php echo e($room->id); ?>" 
                             <?php echo e(old('room_id', $barang?->room_id) == $room->id ? 'selected' : ''); ?>>
@@ -116,8 +117,6 @@ unset($__errorArgs, $__bag); ?>
                     <option value="">-- Pilih Status --</option>
                     <option value="Tersedia" <?php echo e(old('status', $barang?->status) === 'Tersedia' ? 'selected' : ''); ?>>Tersedia</option>
                     <option value="Dipinjam" <?php echo e(old('status', $barang?->status) === 'Dipinjam' ? 'selected' : ''); ?>>Dipinjam</option>
-                    <option value="Terpinjam Otomatis" <?php echo e(old('status', $barang?->status) === 'Terpinjam Otomatis' ? 'selected' : ''); ?>>Terpinjam Otomatis</option>
-                    <option value="Rusak" <?php echo e(old('status', $barang?->status) === 'Rusak' ? 'selected' : ''); ?>>Rusak / Perlu Perbaikan</option>
                     <option value="Tidak Tersedia" <?php echo e(old('status', $barang?->status) === 'Tidak Tersedia' ? 'selected' : ''); ?>>Tidak Tersedia</option>
                 </select>
                 <?php $__errorArgs = ['status'];

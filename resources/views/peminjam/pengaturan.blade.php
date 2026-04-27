@@ -38,6 +38,22 @@
         </form>
     </article>
 
+    <article class="mt-4 rounded-2xl border border-slate-200 p-4">
+        <h2 class="text-sm font-bold text-slate-800">Tema Tampilan</h2>
+        <p class="mt-1 text-xs text-slate-500">Pilih mode tampilan untuk akun Anda.</p>
+
+        <div class="mt-4 space-y-3">
+            <div>
+                <label for="theme-selector" class="mb-1 block text-xs font-semibold text-slate-600">Pilih Tema</label>
+                <select id="theme-selector" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                </select>
+            </div>
+            <button id="save-theme-btn" type="button" class="w-full rounded-lg bg-slate-800 px-3 py-2 text-sm font-semibold text-white">Simpan Tema</button>
+        </div>
+    </article>
+
     <div id="logout-confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/70 px-4">
         <div class="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
             <h3 class="text-base font-bold text-slate-900">Konfirmasi Logout</h3>
@@ -72,6 +88,8 @@
         const openPasswordBtn = document.getElementById('open-password-confirm');
         const confirmLogoutBtn = document.getElementById('confirm-logout-btn');
         const confirmPasswordBtn = document.getElementById('confirm-password-btn');
+        const themeSelector = document.getElementById('theme-selector');
+        const saveThemeBtn = document.getElementById('save-theme-btn');
 
         if (!logoutForm || !passwordForm || !logoutModal || !passwordModal || !openLogoutBtn || !openPasswordBtn || !confirmLogoutBtn || !confirmPasswordBtn) {
             return;
@@ -120,6 +138,14 @@
         confirmPasswordBtn.addEventListener('click', function () {
             passwordForm.submit();
         });
+
+        if (themeSelector && saveThemeBtn && window.SentraTheme) {
+            themeSelector.value = window.SentraTheme.get();
+            saveThemeBtn.addEventListener('click', function () {
+                const selected = themeSelector.value === 'dark' ? 'dark' : 'light';
+                window.SentraTheme.set(selected);
+            });
+        }
     })();
 </script>
 @endpush

@@ -18,7 +18,7 @@
                 </div>
             </button>
             <div class="hidden px-6 pb-4 border-t border-gray-200">
-                <p class="text-gray-700">Untuk meminjam barang, buka menu "Daftar Barang", pilih barang yang ingin dipinjam, tentukan jumlah dan waktu peminjaman, kemudian klik "Pesan". Pengajuan Anda akan dikonfirmasi oleh verifikator, dan Anda dapat melakukan check-in setelah disetujui.</p>
+                <p class="text-gray-700">Untuk meminjam barang, buka menu "Daftar Barang", pilih barang yang ingin dipinjam, tentukan jumlah dan waktu peminjaman, kemudian klik "Pesan". Pengajuan akan tercatat sebagai booking dan dapat langsung diproses sesuai alur check-in/check-out.</p>
             </div>
         </div>
 
@@ -48,7 +48,7 @@
                 </div>
             </button>
             <div class="hidden px-6 pb-4 border-t border-gray-200">
-                <p class="text-gray-700">Check-in dilakukan ketika Anda menerima barang/ruangan dari verifikator. Check-out dilakukan ketika Anda mengembalikan barang/ruangan tersebut. Kedua proses ini harus dikonfirmasi oleh verifikator dengan mengambil foto dokumentasi.</p>
+                <p class="text-gray-700">Check-in dilakukan ketika Anda mulai menggunakan barang/ruangan. Check-out dilakukan saat Anda selesai mengembalikannya. Kedua proses ini membutuhkan dokumentasi sesuai alur sistem.</p>
             </div>
         </div>
 
@@ -63,7 +63,7 @@
                 </div>
             </button>
             <div class="hidden px-6 pb-4 border-t border-gray-200">
-                <p class="text-gray-700">Durasi peminjaman tergantung pada kebijakan institusi. Anda dapat menentukan waktu mulai dan selesai peminjaman saat melakukan booking. Jika Anda memerlukan perpanjangan, hubungi verifikator sebelum waktu selesai yang telah ditentukan.</p>
+                <p class="text-gray-700">Durasi peminjaman tergantung pada kebijakan institusi. Anda dapat menentukan waktu mulai dan selesai peminjaman saat melakukan booking. Jika memerlukan perpanjangan, hubungi admin sebelum waktu selesai yang telah ditentukan.</p>
             </div>
         </div>
 
@@ -78,7 +78,7 @@
                 </div>
             </button>
             <div class="hidden px-6 pb-4 border-t border-gray-200">
-                <p class="text-gray-700">Segera laporkan kepada verifikator jika terdapat kerusakan pada barang/ruangan yang Anda pinjam. Verifikator akan mendokumentasikan kerusakan tersebut dan melaporkannya ke administrator. Anda mungkin akan dikenakan penalti tergantung pada jenis dan tingkat keparahan kerusakan.</p>
+                <p class="text-gray-700">Segera laporkan kepada admin jika terdapat kerusakan pada barang/ruangan yang Anda pinjam. Laporan akan didokumentasikan pada sistem dan Anda mungkin dikenakan penalti tergantung jenis serta tingkat keparahan kerusakan.</p>
             </div>
         </div>
 
@@ -115,7 +115,7 @@
 
     <div class="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
         <h3 class="font-semibold text-blue-900 mb-2"><i class="fas fa-info-circle mr-2"></i>Bantuan Lebih Lanjut</h3>
-        <p class="text-blue-800">Jika Anda memiliki pertanyaan yang tidak terjawab di atas, silakan hubungi verifikator atau administrator sistem untuk mendapatkan bantuan lebih lanjut.</p>
+        <p class="text-blue-800">Jika Anda memiliki pertanyaan yang tidak terjawab di atas, silakan hubungi administrator sistem untuk mendapatkan bantuan lebih lanjut.</p>
     </div>
 </div>
 

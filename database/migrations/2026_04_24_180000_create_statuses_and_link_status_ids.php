@@ -26,7 +26,7 @@ return new class extends Migration
             ['domain' => 'borrow_main', 'code' => 'Selesai', 'label' => 'Selesai', 'description' => 'Peminjaman selesai', 'is_active' => true],
             ['domain' => 'borrow_main', 'code' => 'Dibatalkan', 'label' => 'Dibatalkan', 'description' => 'Tiket dibatalkan peminjam', 'is_active' => true],
             ['domain' => 'borrow_main', 'code' => 'Pelanggaran', 'label' => 'Pelanggaran', 'description' => 'Ada pelanggaran pada tiket', 'is_active' => true],
-            ['domain' => 'borrow_main', 'code' => 'Menunggu Verifikasi', 'label' => 'Menunggu Verifikasi', 'description' => 'Menunggu validasi verifikator/admin', 'is_active' => true],
+            ['domain' => 'borrow_main', 'code' => 'Menunggu Verifikasi', 'label' => 'Menunggu Verifikasi', 'description' => 'Menunggu validasi admin', 'is_active' => true],
 
             ['domain' => 'borrow_checkin', 'code' => 'Tidak Check-in', 'label' => 'Tidak Check-in', 'description' => 'Tidak melakukan check-in', 'is_active' => true],
 

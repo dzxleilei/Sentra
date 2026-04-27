@@ -10,6 +10,7 @@ use App\Models\DamageReport;
 use App\Models\Status;
 use App\Services\BorrowLifecycleService;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
@@ -68,19 +69,15 @@ class BorrowController extends Controller
             'jam_selesai' => 'required|date_format:H:i',
             'alasan_peminjaman' => 'required|in:' . implode(',', self::ALASAN_OPTIONS),
             'alasan_lainnya' => 'nullable|string|min:5|max:255',
-            'lokasi_penggunaan' => 'required|in:' . implode(',', self::LOKASI_OPTIONS),
+            'lokasi_penggunaan' => 'required|string',
             'lokasi_lainnya' => 'nullable|string|min:3|max:255',
         ]);
 
         $this->validateReason($request);
-        $this->validateLocation($request);
+        $location = $this->resolveBorrowLocation($request);
 
         [$waktuMulai, $waktuSelesai] = $this->buildBookingWindow($request->jam_mulai, $request->jam_selesai);
         $thing = Thing::findOrFail($request->thing_id);
-
-        if ($thing->room_id !== null) {
-            return back()->withErrors(['thing_id' => 'Barang ini hanya bisa dibooking melalui menu ruangan.'])->withInput();
-        }
 
         if (! $this->isThingBookable($thing, $waktuMulai, $waktuSelesai)) {
             return back()->withErrors(['thing_id' => 'Barang tidak tersedia pada slot waktu tersebut.'])->withInput();
@@ -90,12 +87,13 @@ class BorrowController extends Controller
             'user_id' => Auth::id(),
             'tipe' => 'Barang',
             'thing_id' => $thing->id,
+            'room_id' => $thing->room_id,
             'waktu_mulai_booking' => $waktuMulai,
             'waktu_selesai_booking' => $waktuSelesai,
             'alasan_peminjaman' => $request->alasan_peminjaman,
             'alasan_lainnya' => $request->alasan_peminjaman === 'Lainnya' ? $request->alasan_lainnya : null,
-            'lokasi_penggunaan' => $request->lokasi_penggunaan,
-            'lokasi_lainnya' => $request->lokasi_penggunaan === 'Lainnya' ? $request->lokasi_lainnya : null,
+            'lokasi_penggunaan' => $location['lokasi_penggunaan'],
+            'lokasi_lainnya' => $location['lokasi_lainnya'],
             'status' => 'Booking',
         ], 'BK-BRG-');
 
@@ -118,10 +116,6 @@ class BorrowController extends Controller
             return back()->withErrors(['qr_code' => 'QR barang tidak dikenali. Pastikan kode QR sesuai ID barang.']);
         }
 
-        if ($thing->room_id !== null) {
-            return back()->withErrors(['qr_code' => 'Barang dari ruangan harus dibooking dari menu ruangan.']);
-        }
-
         $now = Carbon::now()->addMinutes(30);
         $slotStart = $now->copy()->minute > 0
             ? $now->copy()->addHour()->startOfHour()
@@ -138,6 +132,7 @@ class BorrowController extends Controller
             'user_id' => Auth::id(),
             'tipe' => 'Barang',
             'thing_id' => $thing->id,
+            'room_id' => $thing->room_id,
             'waktu_mulai_booking' => $waktuMulai,
             'waktu_selesai_booking' => $waktuSelesai,
             'alasan_peminjaman' => 'Praktikum',
@@ -147,6 +142,162 @@ class BorrowController extends Controller
 
         return redirect()->route('peminjam.tiket', $borrow->id)
             ->with('success', 'Booking cepat via QR berhasil dibuat untuk slot ' . $waktuMulai->format('H:i') . ' - ' . $waktuSelesai->format('H:i') . '.');
+    }
+
+    public function previewQuickBorrowQr(Request $request)
+    {
+        $this->borrowLifecycleService->enforceRules(Auth::id());
+
+        $request->validate([
+            'qr_code' => 'required|string|max:120',
+        ]);
+
+        $thing = Thing::with('room')
+            ->whereRaw('UPPER(kode_thing) = ?', [strtoupper(trim((string) $request->input('qr_code')))])
+            ->first();
+
+        if (! $thing) {
+            return response()->json([
+                'message' => 'QR barang tidak dikenali. Pastikan kode QR sesuai ID barang.',
+            ], 422);
+        }
+
+        $activeBorrow = Borrow::with(['thing', 'room'])
+            ->where('user_id', Auth::id())
+            ->where('thing_id', $thing->id)
+            ->where('status', 'Berlangsung')
+            ->latest('id')
+            ->first();
+
+        $directStart = Carbon::now();
+        $directEnd = $directStart->copy()->addHour();
+
+        if (! $activeBorrow && (! $this->isThingBookable($thing, $directStart, $directEnd))) {
+            return response()->json([
+                'message' => 'Barang sedang tidak tersedia untuk dipinjam saat ini.',
+            ], 409);
+        }
+
+        return response()->json([
+            'mode' => $activeBorrow ? 'checkout' : 'borrow',
+            'thing' => [
+                'id' => $thing->id,
+                'kode_thing' => $thing->kode_thing,
+                'nama' => $thing->nama,
+                'status' => $thing->status,
+                'room_name' => $thing->room->nama ?? null,
+                'room_code' => $thing->room->kode_room ?? null,
+            ],
+            'borrow' => $activeBorrow ? [
+                'id' => $activeBorrow->id,
+                'kode_booking' => $activeBorrow->kode_booking,
+                'status' => $activeBorrow->status,
+            ] : null,
+            'user' => [
+                'name' => Auth::user()->name,
+                'email' => Auth::user()->email,
+                'role' => Auth::user()->role,
+            ],
+        ]);
+    }
+
+    public function processQuickBorrowQr(Request $request)
+    {
+        $this->borrowLifecycleService->enforceRules(Auth::id());
+        $this->assertPenaltyNotBlocked();
+
+        $request->validate([
+            'qr_code' => 'required|string|max:120',
+            'action' => 'required|in:borrow,checkout',
+        ]);
+
+        $qrCode = strtoupper(trim((string) $request->input('qr_code')));
+        $thing = Thing::with('room')
+            ->whereRaw('UPPER(kode_thing) = ?', [$qrCode])
+            ->first();
+
+        if (! $thing) {
+            return back()->withErrors(['qr_code' => 'QR barang tidak dikenali. Pastikan kode QR sesuai ID barang.']);
+        }
+
+        $activeBorrow = Borrow::with(['thing', 'room'])
+            ->where('user_id', Auth::id())
+            ->where('thing_id', $thing->id)
+            ->where('status', 'Berlangsung')
+            ->latest('id')
+            ->first();
+
+        if ($request->action === 'checkout') {
+            if (! $activeBorrow) {
+                return back()->withErrors(['qr_code' => 'Tidak ada peminjaman berlangsung untuk barang ini.']);
+            }
+
+            $request->validate([
+                'foto_akhir' => 'required|file|mimetypes:image/jpeg,image/png,image/webp,image/heic,image/heif|max:10240',
+            ]);
+
+            $path = $this->storePeminjamanPhoto(
+                $request->file('foto_akhir'),
+                (string) $activeBorrow->kode_booking,
+                'akhir'
+            );
+            $now = Carbon::now();
+
+            $activeBorrow->update([
+                'waktu_checkout' => $now,
+                'foto_akhir' => $path,
+                'status' => 'Selesai',
+            ]);
+
+            $this->refreshThingAvailability($thing);
+
+            return redirect()->route('peminjam.riwayat')->with('success', 'Barang berhasil dikembalikan.');
+        }
+
+        $directStart = Carbon::now();
+        $directEnd = $directStart->copy()->addHour();
+
+        if (! $this->isThingBookable($thing, $directStart, $directEnd)) {
+            return back()->withErrors(['qr_code' => 'Barang sedang tidak tersedia untuk dipinjam saat ini.']);
+        }
+
+        $request->validate([
+            'alasan_peminjaman' => 'required|in:' . implode(',', self::ALASAN_OPTIONS),
+            'alasan_lainnya' => 'nullable|string|min:5|max:255',
+            'foto_awal' => 'required|file|mimetypes:image/jpeg,image/png,image/webp,image/heic,image/heif|max:10240',
+        ]);
+
+        $this->validateReason($request);
+
+        $borrow = $this->createBorrowWithUniqueCode([
+            'user_id' => Auth::id(),
+            'tipe' => 'Barang',
+            'thing_id' => $thing->id,
+            'room_id' => $thing->room_id,
+            'waktu_mulai_booking' => Carbon::now(),
+            'waktu_selesai_booking' => Carbon::now()->addHour(),
+            'waktu_checkin' => Carbon::now(),
+            'foto_awal' => null,
+            'alasan_peminjaman' => $request->alasan_peminjaman,
+            'alasan_lainnya' => $request->alasan_peminjaman === 'Lainnya' ? $request->alasan_lainnya : null,
+            'lokasi_penggunaan' => $thing->room ? 'Lainnya' : null,
+            'lokasi_lainnya' => $thing->room?->nama,
+            'status' => 'Berlangsung',
+        ], 'BK-QR-');
+
+        $path = $this->storePeminjamanPhoto(
+            $request->file('foto_awal'),
+            (string) $borrow->kode_booking,
+            'awal'
+        );
+
+        $borrow->update([
+            'foto_awal' => $path,
+        ]);
+
+        $thing->update(['status' => 'Dipinjam']);
+
+        return redirect()->route('peminjam.tiket', $borrow->id)->with('success', 'Barang berhasil dipinjam dan sudah check-in.');
     }
 
     public function addThingToCart(Request $request)
@@ -162,10 +313,6 @@ class BorrowController extends Controller
 
         [$waktuMulai, $waktuSelesai] = $this->buildBookingWindow($request->jam_mulai, $request->jam_selesai);
         $thing = Thing::findOrFail($request->thing_id);
-
-        if ($thing->room_id !== null) {
-            return back()->withErrors(['thing_id' => 'Barang dalam ruangan harus dibooking dari menu ruangan.']);
-        }
 
         if ($thing->status !== 'Tersedia') {
             return back()->withErrors(['thing_id' => 'Barang tidak tersedia untuk dimasukkan ke keranjang.']);
@@ -228,12 +375,12 @@ class BorrowController extends Controller
             'jam_selesai' => 'required|date_format:H:i',
             'alasan_peminjaman' => 'required|in:' . implode(',', self::ALASAN_OPTIONS),
             'alasan_lainnya' => 'nullable|string|min:5|max:255',
-            'lokasi_penggunaan' => 'required|in:' . implode(',', self::LOKASI_OPTIONS),
+            'lokasi_penggunaan' => 'required|string',
             'lokasi_lainnya' => 'nullable|string|min:3|max:255',
         ]);
 
         $this->validateReason($request);
-        $this->validateLocation($request);
+        $location = $this->resolveBorrowLocation($request);
 
         $cartWindow = session(self::THING_CART_WINDOW_KEY);
         if (is_array($cartWindow) && (($cartWindow['jam_mulai'] ?? null) !== $request->jam_mulai || ($cartWindow['jam_selesai'] ?? null) !== $request->jam_selesai)) {
@@ -247,9 +394,7 @@ class BorrowController extends Controller
 
         [$waktuMulai, $waktuSelesai] = $this->buildBookingWindow($request->jam_mulai, $request->jam_selesai);
 
-        $things = Thing::whereIn('id', $cartIds)
-            ->whereNull('room_id')
-            ->get();
+        $things = Thing::whereIn('id', $cartIds)->get();
 
         if ($things->count() !== count($cartIds)) {
             return back()->withErrors(['thing_id' => 'Sebagian barang di keranjang tidak valid. Silakan muat ulang halaman.']);
@@ -274,7 +419,7 @@ class BorrowController extends Controller
             }
 
             return back()->withErrors([
-                'thing_id' => 'Sebagian barang di keranjang sudah dibooking pengguna lain pada jam yang dipilih: ' . implode(', ', $unavailableThingCodes) . '. Barang tersebut otomatis dihapus dari keranjang Anda.',
+                'lokasi_penggunaan' => 'required|string',
             ]);
         }
 
@@ -287,12 +432,13 @@ class BorrowController extends Controller
                 'user_id' => Auth::id(),
                 'tipe' => 'Barang',
                 'thing_id' => $thing->id,
+                'room_id' => $thing->room_id,
                 'waktu_mulai_booking' => $waktuMulai,
                 'waktu_selesai_booking' => $waktuSelesai,
                 'alasan_peminjaman' => $request->alasan_peminjaman,
                 'alasan_lainnya' => $request->alasan_peminjaman === 'Lainnya' ? $request->alasan_lainnya : null,
-                'lokasi_penggunaan' => $request->lokasi_penggunaan,
-                'lokasi_lainnya' => $request->lokasi_penggunaan === 'Lainnya' ? $request->lokasi_lainnya : null,
+                'lokasi_penggunaan' => $location['lokasi_penggunaan'],
+                'lokasi_lainnya' => $location['lokasi_lainnya'],
                 'status' => 'Booking',
             ]);
 
@@ -475,6 +621,8 @@ class BorrowController extends Controller
                 'status_id' => Status::idFor(Status::DOMAIN_BORROW_MAIN, 'Dibatalkan'),
             ]);
 
+        $this->borrowLifecycleService->syncAssetStatuses();
+
         return redirect()->route('peminjam.riwayat')->with('success', 'Tiket berhasil dibatalkan.');
     }
     
@@ -595,7 +743,11 @@ class BorrowController extends Controller
 
         $path = $existingPhoto;
         if ($request->hasFile('foto_awal')) {
-            $path = $request->file('foto_awal')->store('dokumentasi', 'public');
+            $path = $this->storePeminjamanPhoto(
+                $request->file('foto_awal'),
+                (string) $referenceBorrow->kode_booking,
+                'awal'
+            );
         }
 
         foreach ($borrowsToCheckin as $borrow) {
@@ -726,7 +878,11 @@ class BorrowController extends Controller
 
         $path = $existingPhoto;
         if ($request->hasFile('foto_akhir')) {
-            $path = $request->file('foto_akhir')->store('dokumentasi', 'public');
+            $path = $this->storePeminjamanPhoto(
+                $request->file('foto_akhir'),
+                (string) $referenceBorrow->kode_booking,
+                'akhir'
+            );
         }
 
         foreach ($borrowsToCheckout as $borrow) {
@@ -752,47 +908,104 @@ class BorrowController extends Controller
     public function reportDamage(Request $request)
     {
         $request->validate([
+            'kode_booking' => 'nullable|string|max:40',
             'borrow_id' => 'nullable|exists:borrows,id',
-            'thing_input' => 'nullable|required_without:borrow_id|string|min:2|max:120',
+            'thing_input' => 'required_without:borrow_id|string|min:2|max:120',
             'lokasi_barang' => 'required|string|min:3|max:120',
             'keterangan' => 'nullable|string|max:500',
-            'foto_bukti' => 'required|image|max:5120',
+            'foto_bukti' => 'required|file|mimetypes:image/jpeg,image/png,image/webp,image/heic,image/heif|max:10240',
         ]);
 
-        $thing = null;
-        $borrowId = null;
-
-        if ($request->filled('borrow_id')) {
-            $borrow = Borrow::where('id', $request->borrow_id)
+        $kodeBooking = trim((string) $request->kode_booking);
+        $ticketBorrows = collect();
+        if ($kodeBooking !== '') {
+            $ticketBorrows = Borrow::with('thing')
+                ->where('kode_booking', $kodeBooking)
                 ->where('user_id', Auth::id())
-                ->firstOrFail();
+                ->get();
 
-            if (! $borrow->waktu_checkin) {
-                return back()->withErrors(['borrow_id' => 'Laporan dari tiket hanya bisa dibuat setelah check-in.']);
-            }
-
-            if (! $borrow->thing_id) {
-                return back()->withErrors(['borrow_id' => 'Tiket ini tidak terkait barang.']);
-            }
-
-            $thing = Thing::findOrFail($borrow->thing_id);
-
-            $borrowId = $borrow->id;
-        } else {
-            $manualInput = trim((string) $request->thing_input);
-
-            $thing = Thing::query()
-                ->where('kode_thing', $manualInput)
-                ->orWhere('nama', $manualInput)
-                ->when(ctype_digit($manualInput), fn ($query) => $query->orWhere('id', (int) $manualInput))
-                ->first();
-
-            if (! $thing) {
-                return back()->withErrors(['thing_input' => 'Barang tidak ditemukan. Isi dengan ID, kode, atau nama barang yang valid.'])->withInput();
+            if ($ticketBorrows->isEmpty()) {
+                return back()->withErrors(['kode_booking' => 'Kode tiket tidak ditemukan pada akun Anda.'])->withInput();
             }
         }
 
-        $path = $request->file('foto_bukti')->store('laporan-rusak', 'public');
+        $thing = null;
+        $borrowId = null;
+        $selectedBorrow = null;
+
+        if ($request->filled('borrow_id')) {
+            $selectedBorrow = Borrow::with('thing')
+                ->where('id', (int) $request->borrow_id)
+                ->where('user_id', Auth::id())
+                ->first();
+
+            if (! $selectedBorrow) {
+                return back()->withErrors(['borrow_id' => 'ID tiket item tidak ditemukan pada akun Anda.'])->withInput();
+            }
+
+            if ($kodeBooking !== '' && strtoupper((string) $selectedBorrow->kode_booking) !== strtoupper($kodeBooking)) {
+                return back()->withErrors(['kode_booking' => 'ID tiket item tidak sesuai dengan kode tiket.'])->withInput();
+            }
+
+            if (! $selectedBorrow->waktu_checkin) {
+                return back()->withErrors(['borrow_id' => 'Laporan dari tiket hanya bisa dibuat setelah check-in.']);
+            }
+
+            if (! $selectedBorrow->thing_id) {
+                return back()->withErrors(['borrow_id' => 'Tiket ini tidak terkait barang.']);
+            }
+
+            $thing = Thing::findOrFail($selectedBorrow->thing_id);
+            $borrowId = $selectedBorrow->id;
+        } else {
+            $manualInput = trim((string) $request->thing_input);
+
+            if ($kodeBooking !== '') {
+                $selectedBorrow = $ticketBorrows->first(function (Borrow $borrow) use ($manualInput) {
+                    if (! $borrow->thing) {
+                        return false;
+                    }
+
+                    $isIdMatch = ctype_digit($manualInput) && (int) $borrow->thing->id === (int) $manualInput;
+                    $isKodeMatch = strtoupper((string) $borrow->thing->kode_thing) === strtoupper($manualInput);
+                    $isNamaMatch = strtoupper((string) $borrow->thing->nama) === strtoupper($manualInput);
+
+                    return $isIdMatch || $isKodeMatch || $isNamaMatch;
+                });
+
+                if (! $selectedBorrow) {
+                    return back()->withErrors(['thing_input' => 'Barang tidak ditemukan pada kode tiket tersebut.'])->withInput();
+                }
+            } else {
+                $thing = Thing::query()
+                    ->where('kode_thing', $manualInput)
+                    ->orWhere('nama', $manualInput)
+                    ->when(ctype_digit($manualInput), fn ($query) => $query->orWhere('id', (int) $manualInput))
+                    ->first();
+
+                if (! $thing) {
+                    return back()->withErrors(['thing_input' => 'Barang tidak ditemukan. Isi dengan ID, kode, atau nama barang yang valid.'])->withInput();
+                }
+            }
+
+            if ($selectedBorrow) {
+                if (! $selectedBorrow->thing_id) {
+                    return back()->withErrors(['kode_booking' => 'Kode tiket tidak terkait dengan barang yang bisa dilaporkan.'])->withInput();
+                }
+
+                if (! $selectedBorrow->waktu_checkin) {
+                    return back()->withErrors(['kode_booking' => 'Laporan hanya bisa dibuat setelah tiket berstatus check-in.'])->withInput();
+                }
+
+                $thing = Thing::findOrFail($selectedBorrow->thing_id);
+                $borrowId = $selectedBorrow->id;
+            }
+        }
+
+        $path = $this->storeLaporanRusakPhoto(
+            $request->file('foto_bukti'),
+            (string) ($selectedBorrow?->kode_booking ?? ($kodeBooking !== '' ? $kodeBooking : ('MANUAL-' . ($thing?->kode_thing ?? 'BARANG'))))
+        );
 
         DamageReport::create([
             'user_id' => Auth::id(),
@@ -801,10 +1014,41 @@ class BorrowController extends Controller
             'lokasi_barang' => $request->lokasi_barang,
             'keterangan' => $request->keterangan,
             'foto_bukti' => $path,
-            'status' => 'Menunggu Verifikasi',
+            'status' => 'Sedang Ditinjau',
         ]);
 
         return back()->with('success', 'Laporan barang rusak berhasil dikirim.');
+    }
+
+    private function storePeminjamanPhoto(UploadedFile $file, string $kodeBooking, string $jenis): string
+    {
+        $safeCode = strtoupper(trim($kodeBooking));
+        $safeCode = preg_replace('/[^A-Z0-9\-]/', '-', $safeCode) ?: 'TIKET';
+        $safeType = $jenis === 'akhir' ? 'akhir' : 'awal';
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+        if ($extension === '') {
+            $extension = 'jpg';
+        }
+
+        $timestamp = now()->format('YmdHis');
+        $name = $safeCode . '-' . $safeType . '-' . $timestamp . '-' . Str::lower(Str::random(6)) . '.' . $extension;
+
+        return $file->storeAs('dokumentasi/peminjaman', $name, 'public');
+    }
+
+    private function storeLaporanRusakPhoto(UploadedFile $file, string $kodeBooking): string
+    {
+        $safeCode = strtoupper(trim($kodeBooking));
+        $safeCode = preg_replace('/[^A-Z0-9\-]/', '-', $safeCode) ?: 'TIKET';
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+        if ($extension === '') {
+            $extension = 'jpg';
+        }
+
+        $timestamp = now()->format('YmdHis');
+        $name = $safeCode . '-laporan-rusak-' . $timestamp . '-' . Str::lower(Str::random(6)) . '.' . $extension;
+
+        return $file->storeAs('dokumentasi/laporan-rusak', $name, 'public');
     }
 
     private function generateBookingCode(string $prefix): string
@@ -892,13 +1136,40 @@ class BorrowController extends Controller
         }
     }
 
-    private function validateLocation(Request $request): void
+    private function resolveBorrowLocation(Request $request): array
     {
-        if ($request->lokasi_penggunaan === 'Lainnya' && empty(trim((string) $request->lokasi_lainnya))) {
+        $selection = trim((string) $request->input('lokasi_penggunaan'));
+
+        if ($selection === '') {
             throw ValidationException::withMessages([
-                'lokasi_lainnya' => 'Lokasi lainnya wajib diisi jika memilih opsi Lainnya.',
+                'lokasi_penggunaan' => 'Lokasi penggunaan wajib dipilih.',
             ]);
         }
+
+        if ($selection === 'Lainnya') {
+            if (empty(trim((string) $request->lokasi_lainnya))) {
+                throw ValidationException::withMessages([
+                    'lokasi_lainnya' => 'Lokasi lainnya wajib diisi jika memilih opsi Lainnya.',
+                ]);
+            }
+
+            return [
+                'lokasi_penggunaan' => 'Lainnya',
+                'lokasi_lainnya' => trim((string) $request->lokasi_lainnya),
+            ];
+        }
+
+        $room = Room::find((int) $selection);
+        if (! $room) {
+            throw ValidationException::withMessages([
+                'lokasi_penggunaan' => 'Lokasi penggunaan tidak valid.',
+            ]);
+        }
+
+        return [
+            'lokasi_penggunaan' => $room->nama,
+            'lokasi_lainnya' => null,
+        ];
     }
 
     private function assertPenaltyNotBlocked(): void
@@ -970,7 +1241,7 @@ class BorrowController extends Controller
             $totalUnit = max(1, (int) $group->total_unit);
 
             $active = Borrow::where('room_id', $room->id)
-                ->where('tipe', 'Barang_Dari_Ruangan')
+                ->whereIn('tipe', ['Barang_Dari_Ruangan', 'Barang'])
                 ->whereIn('status', ['Booking', 'Berlangsung'])
                 ->where(function ($query) use ($mulai, $selesai) {
                     $query->where('waktu_mulai_booking', '<', $selesai)

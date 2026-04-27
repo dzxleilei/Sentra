@@ -27,7 +27,7 @@
             <label class="mb-1 block text-xs font-semibold text-slate-600">Lokasi Simpan</label>
             <select name="lokasi" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                 <option value="">Semua</option>
-                <option value="Sarpras" {{ $filterLokasi === 'Sarpras' ? 'selected' : '' }}>Sarpras</option>
+                <option value="Ruangan" {{ $filterLokasi === 'Ruangan' ? 'selected' : '' }}>Ruangan</option>
             </select>
         </div>
         <div class="flex items-end">
@@ -140,9 +140,11 @@
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-slate-600">Lokasi Penggunaan Barang</label>
                     <select name="lokasi_penggunaan" x-model="lokasi" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" {{ $bookingBlocked ? 'disabled' : '' }}>
+                        <option value="" {{ old('lokasi_penggunaan', '') === '' ? 'selected' : '' }}>Pilih ruangan</option>
                         @foreach($lokasiOptions as $lokasi)
-                            <option value="{{ $lokasi }}" {{ old('lokasi_penggunaan', 'Laboratorium Komputer') === $lokasi ? 'selected' : '' }}>{{ $lokasi }}</option>
+                            <option value="{{ $lokasi->id }}" {{ (string) old('lokasi_penggunaan', '') === (string) $lokasi->id ? 'selected' : '' }}>{{ $lokasi->nama }} - {{ $lokasi->status }}</option>
                         @endforeach
+                        <option value="Lainnya" {{ old('lokasi_penggunaan') === 'Lainnya' ? 'selected' : '' }}>Lainnya</option>
                     </select>
                 </div>
 
@@ -170,6 +172,9 @@
                     <div>
                         <p class="text-xs text-slate-500">{{ $item->kode_thing }}</p>
                         <h3 class="mt-1 font-semibold">{{ $item->nama }}</h3>
+                        @if(!is_null($item->room_id))
+                            <p class="mt-1 text-[11px] text-slate-500">Lokasi: {{ $item->room?->nama ?? 'Ruangan' }}</p>
+                        @endif
                     </div>
                     <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass }}">{{ $statusLabel }}</span>
                 </div>
@@ -179,22 +184,22 @@
                     <div class="mt-2 flex flex-wrap gap-1.5 text-[10px]">
                         @php
                             $availableTimes = collect($itemTimeOptions[$item->id] ?? []);
-                            $allTimes = collect($allTimeOptions->values());
-                            $unavailableTimes = $allTimes->reject(fn ($time) => $availableTimes->contains($time));
+                            $detailTimes = collect($detailTimeOptions->values());
+                            $nowTime = \Illuminate\Support\Carbon::now()->format('H:i');
                         @endphp
-                        @forelse($availableTimes as $time)
-                            <span class="rounded-full bg-emerald-100 px-2 py-1 font-semibold text-emerald-800">{{ $time }}</span>
-                        @empty
-                            <span class="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-500">Tidak ada sesi tersedia</span>
-                        @endforelse
+                        @foreach($detailTimes as $time)
+                            @php
+                                $isPast = $time <= $nowTime;
+                                $isAvailable = $availableTimes->contains($time);
+                                $timeClass = $isPast
+                                    ? 'bg-slate-200 text-slate-500'
+                                    : ($isAvailable
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : 'bg-rose-100 text-rose-800');
+                            @endphp
+                            <span class="rounded-full px-2 py-1 font-semibold {{ $timeClass }}">{{ $time }}</span>
+                        @endforeach
                     </div>
-                    @if($unavailableTimes->isNotEmpty())
-                        <div class="mt-3 flex flex-wrap gap-1.5 text-[10px]">
-                            @foreach($unavailableTimes as $time)
-                                <span class="rounded-full border border-slate-300 px-2 py-1 font-semibold text-slate-400 line-through">{{ $time }}</span>
-                            @endforeach
-                        </div>
-                    @endif
                 </div>
 
                 @if($isAvailable)
@@ -229,7 +234,7 @@
                 start: @json($cartWindow['jam_mulai'] ?? old('jam_mulai', '')),
                 end: @json($cartWindow['jam_selesai'] ?? old('jam_selesai', '')),
                 alasan: '{{ old('alasan_peminjaman', 'Praktikum') }}',
-                lokasi: '{{ old('lokasi_penggunaan', 'Laboratorium Komputer') }}',
+                lokasi: @json(old('lokasi_penggunaan', '')),
                 endOptions: [],
                 hasSession() {
                     return this.start !== '' && this.end !== '';

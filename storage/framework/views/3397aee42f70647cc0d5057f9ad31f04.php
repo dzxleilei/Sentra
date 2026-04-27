@@ -68,25 +68,25 @@
             <table class="w-full min-w-[980px]">
                 <thead class="bg-slate-50">
                     <tr>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Nama User</th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Email</th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Jumlah Tiket</th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Poin Penalti</th>
-                        <th class="px-6 py-4 text-left text-sm font-semibold text-gray-800">Lihat Tiket</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Nama User</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Email</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Jumlah Tiket</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Poin Penalti</th>
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Lihat Tiket</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200">
+                <tbody class="divide-y divide-slate-200">
                     <?php $__empty_1 = true; $__currentLoopData = $laporanUsers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $user): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 font-semibold text-gray-800"><?php echo e($user->name); ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-600"><?php echo e($user->email); ?></td>
-                            <td class="px-6 py-4 text-sm text-gray-700"><?php echo e($user->total_tiket); ?></td>
-                            <td class="px-6 py-4 text-sm">
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-6 py-3.5 text-sm font-semibold text-slate-800"><?php echo e($user->name); ?></td>
+                            <td class="px-6 py-3.5 text-sm text-slate-600"><?php echo e($user->email); ?></td>
+                            <td class="px-6 py-3.5 text-sm text-slate-700"><?php echo e($user->total_tiket); ?></td>
+                            <td class="px-6 py-3.5 text-sm">
                                 <span class="inline-block rounded-full px-2.5 py-1 text-xs font-semibold <?php echo e($user->penalty_points >= 20 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'); ?>">
                                     <?php echo e((int) $user->penalty_points); ?> poin
                                 </span>
                             </td>
-                            <td class="px-6 py-4 text-sm">
+                            <td class="px-6 py-3.5 text-sm">
                                 <a href="<?php echo e(route('admin.laporan.tiket', ['userId' => $user->id, 'bulan' => $bulan, 'tahun' => $tahun])); ?>" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100" title="Lihat tiket <?php echo e($user->name); ?>" aria-label="Lihat tiket <?php echo e($user->name); ?>">
                                     <i class="fas fa-eye"></i>
                                 </a>
@@ -94,7 +94,7 @@
                         </tr>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <tr>
-                            <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                            <td colspan="5" class="px-6 py-8 text-center text-sm text-slate-500">
                                 <i class="fas fa-inbox mr-2"></i>Tidak ada data peminjaman untuk filter yang dipilih.
                             </td>
                         </tr>
